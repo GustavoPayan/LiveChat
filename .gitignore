@@ -1,0 +1,26 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node / Build
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error/log*
+
+# Composer
+/vendor/
+
+# Environment
+.env
+.env.*
+
+# WordPress
+wp-config.php
+
+# Zip / Build files
+*.zip
+*.tar
+*.gz
