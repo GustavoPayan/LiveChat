@@ -61,6 +61,28 @@ Este plugin está pensado para desarrolladores o dueños de sitios que quieren:
 
 ---
 
+## ✨ Features
+
+- Live chat integration for WordPress
+- Telegram-based real-time messaging
+- Lightweight and easy to install
+- No third-party chat services required
+- Ideal for customer support or lead capture
+
+
+---
+
+## 🛣️ Roadmap
+
+- [ ] Imprube settings page
+- [ ] Multiple Telegram users
+- [ ] Chat history storage
+- [ ] Custom UI themes
+
+
+
+---
+
 > LiveChat es un plugin de WordPress que desarrollé para integrar un sistema de chat en vivo en cualquier sitio web, conectándolo con Telegram para enviar y recibir mensajes en tiempo real. Está construido en PHP y JavaScript, diseñado para ser ligero y fácil de configurar. Los visitantes pueden iniciar una conversación desde el sitio web, y yo podía responder directamente desde Telegram, haciendo el soporte más flexible y accesible.
 
 ---
