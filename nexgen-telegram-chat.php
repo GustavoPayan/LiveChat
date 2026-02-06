@@ -2,8 +2,8 @@
 /**
  * Plugin Name: NexGen Telegram Chat
  * Description: Plugin de chat bidireccional integrado con Telegram Bot para WordPress
- * Version: 2.1.0
- * Author: Tu Nombre
+ * Version: 2.1.1
+ * Author: Gustavo Payan
  */
 
 // Prevenir acceso directo
@@ -21,6 +21,10 @@ class NexGenTelegramChat {
         add_action('init', array($this, 'init'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
         add_action('wp_footer', array($this, 'render_chat'));
+
+        //registra hooks para ver en el menu de WordPress
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_init', array($this, 'admin_init'));
 
         add_action('wp_ajax_nexgen_send_message', array($this, 'handle_message'));
         add_action('wp_ajax_nopriv_nexgen_send_message', array($this, 'handle_message'));
@@ -512,14 +516,16 @@ class NexGenTelegramChat {
     }
 
     public function add_admin_menu() {
-        add_options_page(
-            'NexGen Telegram Chat',
-            'Telegram Chat',
-            'manage_options',
-            'nexgen-telegram-chat',
-            array($this, 'admin_page')
-        );
-    }
+    add_menu_page(
+        'NexGen Telegram Chat',           // Título de la página
+        'NexGen Livechat',               // Texto que aparece en el menú
+        'manage_options',                  // Capacidad requerida (solo admins)
+        'nexgen-telegram-chat',            // Slug único de la página
+        array($this, 'admin_page'),        // Función que renderiza el contenido
+        'dashicons-format-chat',           // Ícono del menú (burbuja de chat)
+        75                                 // Posición en el menú (75 = debajo de "Herramientas")
+    );
+}
 
     public function admin_init() {
         register_setting('nexgen_chat_settings', 'nexgen_bot_token');
@@ -541,7 +547,8 @@ class NexGenTelegramChat {
         $webhook_url = admin_url('admin-ajax.php?action=nexgen_telegram_webhook');
         ?>
         <div class="wrap">
-            <h1>🚀 NexGen Telegram Chat - Configuración Bidireccional</h1>
+            <h1>🚀 NexGen Telegram Chat</h1>
+            <p>Este Plugin permite hacer uso de telegram con un chatbot para poder tener un chat en tiempo real desde la web con los usuarios </p>
 
             <?php if ($is_configured): ?>
                 <div class="notice notice-success">
