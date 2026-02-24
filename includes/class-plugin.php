@@ -480,27 +480,59 @@ class NexGen_Telegram_Chat {
 	 */
 	public function admin_init() {
 		// Telegram settings
-		register_setting( 'nexgen_chat_settings', 'nexgen_bot_token' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_chat_id' );
+		register_setting( 'nexgen_chat_settings', 'nexgen_bot_token', [
+			'sanitize_callback' => 'sanitize_text_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_chat_id', [
+			'sanitize_callback' => 'sanitize_text_field',
+		] );
 
 		// Chat UI settings
-		register_setting( 'nexgen_chat_settings', 'nexgen_chat_title' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_welcome_message' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_error_message' );
+		register_setting( 'nexgen_chat_settings', 'nexgen_chat_title', [
+			'sanitize_callback' => 'sanitize_text_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_welcome_message', [
+			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_error_message', [
+			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
 
 		// Appearance settings
-		register_setting( 'nexgen_chat_settings', 'nexgen_primary_color' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_secondary_color' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_background_color' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_chat_position' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_auto_open_delay' );
+		register_setting( 'nexgen_chat_settings', 'nexgen_primary_color', [
+			'sanitize_callback' => 'sanitize_hex_color',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_secondary_color', [
+			'sanitize_callback' => 'sanitize_hex_color',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_background_color', [
+			'sanitize_callback' => 'sanitize_hex_color',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_chat_position', [
+			'sanitize_callback' => 'sanitize_text_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_auto_open_delay', [
+			'sanitize_callback' => 'absint',
+		] );
 
 		// N8N settings (Phase 2)
-		register_setting( 'nexgen_chat_settings', 'nexgen_n8n_enabled' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_n8n_webhook_url' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_n8n_api_key' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_n8n_timeout' );
-		register_setting( 'nexgen_chat_settings', 'nexgen_ai_keywords' );
+		register_setting( 'nexgen_chat_settings', 'nexgen_n8n_enabled', [
+			'sanitize_callback' => function( $value ) {
+				return ! empty( $value ) ? 1 : 0;
+			},
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_n8n_webhook_url', [
+			'sanitize_callback' => 'esc_url_raw',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_n8n_api_key', [
+			'sanitize_callback' => 'sanitize_text_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_n8n_timeout', [
+			'sanitize_callback' => 'absint',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_ai_keywords', [
+			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
 	}
 
 	/**
