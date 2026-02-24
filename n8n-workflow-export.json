@@ -1,0 +1,147 @@
+{
+  "name": "LiveChat Auto-Response Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "livechat",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "responseData": "noData"
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "{{ $execution.id }}"
+    },
+    {
+      "parameters": {
+        "mode": "set",
+        "fields": {
+          "values": [
+            {
+              "name": "message",
+              "stringValue": "{{ $json.message }}"
+            },
+            {
+              "name": "session_id",
+              "stringValue": "={{ $json.session_id }}"
+            },
+            {
+              "name": "visitor",
+              "stringValue": "={{ $json.visitor }}"
+            },
+            {
+              "name": "site",
+              "stringValue": "={{ $json.site }}"
+            },
+            {
+              "name": "timestamp",
+              "stringValue": "={{ $json.timestamp }}"
+            }
+          ]
+        }
+      },
+      "id": "set-data-node",
+      "name": "Extract Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "const input = $input.all()[0];\nconst msg = (input.json?.message || '').toLowerCase();\n\nconst responses = {\n  'hosting': '🌐 Nuestros planes de hosting incluyen SSL y soporte 24/7. ¿Cuál es tu presupuesto?',\n  'seo': '📈 Podemos posicionar tu sitio en Google. ¿En qué sector trabajas?',\n  'dominio': '🔗 Registramos dominios en todas las extensiones. ¿Qué nombre buscas?',\n  'precio': '💰 Los planes comienzan en €500/mes. ¿Necesitas un presupuesto personalizado?'\n};\n\nlet reply = '👋 Hola! Gracias por contactar. Pregunta sobre: hosting, seo, dominio, precio';\n\nfor (const [keyword, text] of Object.entries(responses)) {\n  if (msg.includes(keyword)) {\n    reply = text;\n    break;\n  }\n}\n\nreturn {\n  response: reply\n};"
+      },
+      "id": "function-node",
+      "name": "Generate Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "mode": "set",
+        "fields": {
+          "values": [
+            {
+              "name": "response",
+              "stringValue": "={{ $json.response }}"
+            }
+          ]
+        }
+      },
+      "id": "format-response-node",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "response": "noData"
+      },
+      "id": "http-response-node",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Data",
+            "branch": 0,
+            "socket": 0
+          }
+        ]
+      ]
+    },
+    "Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Response",
+            "branch": 0,
+            "socket": 0
+          }
+        ]
+      ]
+    },
+    "Generate Response": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "branch": 0,
+            "socket": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "HTTP Response",
+            "branch": 0,
+            "socket": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "UTC"
+  },
+  "staticData": null,
+  "tags": [
+    "LiveChat",
+    "AutoResponse",
+    "Free"
+  ]
+}

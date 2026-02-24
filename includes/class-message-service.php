@@ -56,7 +56,67 @@ class NexGen_Message_Service {
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
 
+		// Upgrade existing table schema if needed
+		self::upgrade_table_schema();
+
 		return true;
+	}
+
+	/**
+	 * Upgrade table schema to add missing columns
+	 * This handles tables created with older schema versions
+	 *
+	 * @return void
+	 */
+	private static function upgrade_table_schema() {
+		global $wpdb;
+
+		$table_name = self::get_table_name();
+
+		// Check and add ip_hash column if missing
+		$ip_hash_exists = $wpdb->get_results(
+			$wpdb->prepare(
+				"SHOW COLUMNS FROM $table_name LIKE %s",
+				'ip_hash'
+			)
+		);
+
+		if ( empty( $ip_hash_exists ) ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query(
+				"ALTER TABLE $table_name ADD COLUMN ip_hash varchar(64) AFTER telegram_message_id"
+			);
+		}
+
+		// Check and add is_suspicious column if missing
+		$suspicious_exists = $wpdb->get_results(
+			$wpdb->prepare(
+				"SHOW COLUMNS FROM $table_name LIKE %s",
+				'is_suspicious'
+			)
+		);
+
+		if ( empty( $suspicious_exists ) ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query(
+				"ALTER TABLE $table_name ADD COLUMN is_suspicious tinyint(1) DEFAULT 0 AFTER ip_hash"
+			);
+		}
+
+		// Check and add sender_info column if missing
+		$sender_info_exists = $wpdb->get_results(
+			$wpdb->prepare(
+				"SHOW COLUMNS FROM $table_name LIKE %s",
+				'sender_info'
+			)
+		);
+
+		if ( empty( $sender_info_exists ) ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query(
+				"ALTER TABLE $table_name ADD COLUMN sender_info json AFTER message_type"
+			);
+		}
 	}
 
 	/**
