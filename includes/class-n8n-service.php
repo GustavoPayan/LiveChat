@@ -61,18 +61,42 @@ class NexGen_N8N_Service {
 	public static function should_process( $message ) {
 		$config = self::get_config();
 
+		// Log configuration for debugging
+		NexGen_Security::log_event( 'n8n_check_process', [
+			'enabled'    => $config['enabled'],
+			'message'    => $message,
+			'keywords'   => $config['keywords'],
+			'keyword_count' => count( $config['keywords'] ),
+		] );
+
 		if ( ! $config['enabled'] ) {
+			NexGen_Security::log_event( 'n8n_disabled', [ 'reason' => 'N8N not enabled' ] );
 			return false;
 		}
 
 		$keywords = $config['keywords'];
 		$message  = strtolower( $message );
 
+		if ( empty( $keywords ) ) {
+			NexGen_Security::log_event( 'n8n_no_keywords', [ 'message' => $message ] );
+			return false;
+		}
+
 		foreach ( $keywords as $keyword ) {
-			if ( stripos( $message, $keyword ) !== false ) {
+			$keyword_lower = strtolower( trim( $keyword ) );
+			if ( stripos( $message, $keyword_lower ) !== false ) {
+				NexGen_Security::log_event( 'n8n_keyword_matched', [
+					'message'   => $message,
+					'keyword'   => $keyword_lower,
+				] );
 				return true;
 			}
 		}
+
+		NexGen_Security::log_event( 'n8n_no_match', [
+			'message'  => $message,
+			'keywords' => $keywords,
+		] );
 
 		return false;
 	}
@@ -103,6 +127,14 @@ class NexGen_N8N_Service {
 			'timestamp'  => current_time( 'mysql' ),
 		];
 
+		// Log outgoing request
+		NexGen_Security::log_event( 'n8n_request_start', [
+			'url'        => $config['webhook_url'],
+			'session_id' => $session_id,
+			'message'    => $message,
+			'visitor'    => $payload['visitor'],
+		] );
+
 		$args = [
 			'body'      => wp_json_encode( $payload ),
 			'headers'   => [
@@ -116,20 +148,29 @@ class NexGen_N8N_Service {
 		$response = wp_remote_post( $config['webhook_url'], $args );
 
 		if ( is_wp_error( $response ) ) {
+			$error_msg = $response->get_error_message();
 			NexGen_Security::log_event( 'n8n_error', [
-				'error'      => $response->get_error_message(),
+				'error'      => $error_msg,
 				'session_id' => $session_id,
+				'url'        => $config['webhook_url'],
 			] );
 
 			return [
 				'success'  => false,
 				'response' => null,
-				'error'    => 'N8N connection error: ' . $response->get_error_message(),
+				'error'    => 'N8N connection error: ' . $error_msg,
 			];
 		}
 
 		$response_code = wp_remote_retrieve_response_code( $response );
 		$response_body = wp_remote_retrieve_body( $response );
+
+		// Log response code
+		NexGen_Security::log_event( 'n8n_response', [
+			'code'       => $response_code,
+			'session_id' => $session_id,
+			'body_length' => strlen( $response_body ),
+		] );
 
 		if ( $response_code < 200 || $response_code >= 300 ) {
 			NexGen_Security::log_event( 'n8n_api_error', [
@@ -150,8 +191,9 @@ class NexGen_N8N_Service {
 		$response_text = isset( $decoded['response'] ) ? $decoded['response'] : $response_body;
 
 		NexGen_Security::log_event( 'n8n_success', [
-			'session_id' => $session_id,
+			'session_id'  => $session_id,
 			'has_response' => ! empty( $response_text ),
+			'response_preview' => substr( $response_text, 0, 100 ),
 		] );
 
 		return [

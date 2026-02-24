@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin Page Template for NexGen Telegram Chat
+ * Admin Page Template for NexGen Telegram Chat - TABBED VERSION
  *
  * @package NexGenTelegramChat
  */
@@ -29,10 +29,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</div>
 	<?php endif; ?>
 
+	<!-- Tabs Navigation -->
+	<div class="nexgen-tabs">
+		<button class="nexgen-tab-button active" onclick="switchTab(event, 'tab-telegram')">🤖 Telegram</button>
+		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-chat')">💬 Chat UI</button>
+		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-appearance')">🎨 Apariencia</button>
+		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-n8n')">🧠 N8N</button>
+		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-webhook')">🔗 Webhook</button>
+	</div>
+
 	<form method="post" action="options.php">
 		<?php settings_fields( 'nexgen_chat_settings' ); ?>
 
-		<h2>🤖 Configuración de Telegram</h2>
+		<!-- TAB 1: Telegram Configuration -->
+		<div id="tab-telegram" class="nexgen-tab-content active">
+			<h2>🤖 Configuración de Telegram</h2>
 		<table class="form-table">
 			<tr>
 				<th scope="row"><label for="nexgen_bot_token">Token del Bot de Telegram</label></th>
@@ -50,9 +61,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 				</td>
 			</tr>
 		</table>
+		</div>
 
-		<h2>💬 Configuración del Chat</h2>
-		<table class="form-table">
+		<!-- TAB 2: Chat UI Configuration -->
+		<div id="tab-chat" class="nexgen-tab-content">
+			<h2>💬 Configuración del Chat</h2>
+			<table class="form-table">
 			<tr>
 				<th scope="row"><label for="nexgen_chat_title">Título del Chat</label></th>
 				<td>
@@ -74,9 +88,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 				</td>
 			</tr>
 		</table>
+		</div>
 
-		<h2>🎨 Personalización Visual</h2>
-		<table class="form-table">
+		<!-- TAB 3: Appearance -->
+		<div id="tab-appearance" class="nexgen-tab-content">
+			<h2>🎨 Personalización Visual</h2>
+			<table class="form-table">
 			<tr>
 				<th scope="row"><label for="nexgen_primary_color">Color Primario</label></th>
 				<td>
@@ -102,26 +119,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<th scope="row"><label for="nexgen_chat_position">Posición del Chat</label></th>
 				<td>
 					<select name="nexgen_chat_position" id="nexgen_chat_position">
-						<option value="bottom-right" <?php selected( get_option( 'nexgen_chat_position', 'bottom-right' ), 'bottom-right' ); ?>>Abajo Derecha</option>
-						<option value="bottom-left" <?php selected( get_option( 'nexgen_chat_position', 'bottom-left' ), 'bottom-left' ); ?>>Abajo Izquierda</option>
+						<option value="bottom-right" <?php selected( get_option( 'nexgen_chat_position', 'bottom-right' ), 'bottom-right' ); ?>>Abajo a la derecha</option>
+						<option value="bottom-left" <?php selected( get_option( 'nexgen_chat_position', 'bottom-right' ), 'bottom-left' ); ?>>Abajo a la izquierda</option>
 					</select>
 				</td>
 			</tr>
 
 			<tr>
-				<th scope="row"><label for="nexgen_auto_open_delay">Auto-apertura (segundos)</label></th>
+				<th scope="row"><label for="nexgen_auto_open_delay">Abrir automáticamente después de (segundos)</label></th>
 				<td>
-					<input type="number" name="nexgen_auto_open_delay" id="nexgen_auto_open_delay" value="<?php echo esc_attr( get_option( 'nexgen_auto_open_delay', 20 ) ); ?>" min="0" max="300" />
-					<p class="description">0 para desactivar la auto-apertura</p>
+					<input type="number" name="nexgen_auto_open_delay" id="nexgen_auto_open_delay" value="<?php echo esc_attr( get_option( 'nexgen_auto_open_delay', 0 ) ); ?>" min="0" max="60" />
+					<p class="description">0 = no abrir automáticamente</p>
 				</td>
 			</tr>
 		</table>
+		</div>
 
-		<hr>
-
-		<h2>🤖 Automatización N8N</h2>
-		<p><strong>Configura N8N para automatizar respuestas a preguntas comunes sobre desarrollo web y marketing digital.</strong></p>
-		
+		<!-- TAB 4: N8N Automation -->
+		<div id="tab-n8n" class="nexgen-tab-content">
+			<h2>🤖 Automatización N8N</h2>
 		<table class="form-table">
 			<tr>
 				<th scope="row"><label for="nexgen_n8n_enabled">Habilitar N8N</label></th>
@@ -156,83 +172,168 @@ if ( ! defined( 'ABSPATH' ) ) {
 			</tr>
 
 			<tr>
-				<th scope="row"><label for="nexgen_ai_keywords">Palabras clave para automatización</label></th>
+				<th scope="row"><label for="nexgen_ai_keywords">Palabras clave para IA</label></th>
 				<td>
-					<textarea name="nexgen_ai_keywords" id="nexgen_ai_keywords" rows="5" class="large-text" placeholder="hosting&#10;dominio&#10;ssl&#10;seo&#10;marketing digital&#10;estrategia&#10;precio&#10;desarrollo web"><?php 
-						$keywords = json_decode( get_option( 'nexgen_ai_keywords', '["hosting","dominio","ssl","seo","marketing digital","estrategia","precio","desarrollo web"]' ), true );
-						if ( is_array( $keywords ) ) {
-							echo esc_textarea( implode( "\n", $keywords ) );
-						}
-					?></textarea>
-					<p class="description">Una palabra clave por línea. Los mensajes que contienen estas palabras se enviarán a N8N automáticamente.</p>
+					<textarea name="nexgen_ai_keywords" id="nexgen_ai_keywords" rows="6" class="large-text" placeholder="hosting&#10;seo&#10;dominio&#10;precio&#10;desarrollo"><?php echo esc_textarea( get_option( 'nexgen_ai_keywords' ) ); ?></textarea>
+					<p class="description">Una palabra clave por línea. Los mensajes que contengan estas palabras se envían a N8N en lugar de Telegram.</p>
 				</td>
 			</tr>
 		</table>
 
-		<div class="notice notice-info" style="margin: 20px 0;">
-			<p><strong>📚 Cómo funciona:</strong></p>
-			<ol>
-				<li>Si el mensaje contiene alguna de las palabras clave → se envía a N8N para respuesta automática</li>
-				<li>Si N8N responde exitosamente → el usuario recibirá la respuesta automática</li>
-				<li>Si N8N falla o es lenta → se enrutará a Telegram para respuesta humana</li>
-				<li>Si no hay palabras clave → se enrutará directamente a Telegram</li>
-			</ol>
+		<div class="notice notice-info">
+			<p><strong>⚙️ Cómo funciona:</strong></p>
+			<p>Si un mensaje contiene una de las palabras clave y N8N está habilitado, se envía a N8N en lugar de a Telegram. Si N8N no responde en el tiempo límite, se redirige a Telegram automáticamente.</p>
 		</div>
 
-		<?php submit_button( 'Guardar Configuración' ); ?>
-	</form>
+		<div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+			<h4>🧪 Prueba de Conexión N8N</h4>
+			<button type="button" class="button button-primary" onclick="testN8NConnection()">🧪 Probar Conexión N8N</button>
+			<p class="description" style="margin-top: 10px;">Envía un mensaje de prueba a tu webhook N8N para verificar que está funcionando.</p>
+		</div>
 
-	<hr>
+		<hr style="margin: 30px 0;">
 
-	<h2>📖 Estructura de N8N Webhook</h2>
-	<div class="notice notice-info">
-		<p><strong>Tu endpoint N8N recibirá JSON con esta estructura:</strong></p>
+		<h4>📋 Estructura del Webhook N8N</h4>
+		<p><strong>Petición (Request):</strong></p>
 		<pre style="background: #f0f0f0; padding: 10px; border-radius: 4px; overflow-x: auto;">
 {
-  "message": "¿Cuál es el mejor hosting?",
+  "message": "¿Tienes hosting?",
   "session_id": "chat_juan_a1b2c3",
   "visitor": "Juan",
   "site": "Mi Sitio Web",
-  "timestamp": "2026-02-23 14:30:00"
+  "timestamp": "2026-02-24 10:30:00"
 }
 		</pre>
-		<p><strong>Tu N8N debe responder con JSON en este formato:</strong></p>
+
+		<p><strong>Respuesta (Response - REQUERIDA):</strong></p>
 		<pre style="background: #f0f0f0; padding: 10px; border-radius: 4px; overflow-x: auto;">
 {
-  "response": "El mejor hosting es... [tu respuesta]"
+  "response": "🌐 Ofrecemos hosting con SSL y soporte 24/7. ¿Cuál es tu presupuesto?"
 }
 		</pre>
-	</div>
+		</div>
 
-	<h2>🔗 Configuración del Webhook (REQUERIDO para chat bidireccional)</h2>
-	<div class="notice notice-info">
-		<p><strong>📋 URL del Webhook:</strong></p>
-		<code style="background: #f0f0f0; padding: 10px; display: block; margin: 10px 0; word-break: break-all;"><?php echo esc_html( $webhook_url ); ?></code>
-		<p>Haz clic en "Configurar Webhook" arriba para configurarlo automáticamente.</p>
-	</div>
+		<!-- TAB 5: Webhook Settings -->
+		<div id="tab-webhook" class="nexgen-tab-content">
+			<h2>🔗 Configuración del Webhook</h2>
+			
+			<div class="notice notice-info">
+				<p><strong>📋 URL del Webhook de Telegram:</strong></p>
+				<code style="background: #f0f0f0; padding: 10px; display: block; margin: 10px 0; word-break: break-all;"><?php echo esc_html( $webhook_url ); ?></code>
+				<p>Haz clic en "Configurar Webhook" en la sección de configuración del bot para registrar esta URL en Telegram.</p>
+			</div>
 
-	<h2>💡 Cómo responder desde Telegram</h2>
-	<div class="notice notice-success">
-		<p><strong>Tienes 2 formas de responder:</strong></p>
-		<ol>
-			<li><strong>Responder al mensaje:</strong> Usa la función "Responder" de Telegram en el mensaje que recibiste</li>
-			<li><strong>Comando /reply:</strong> Escribe <code>/reply session_id tu_respuesta</code></li>
-		</ol>
-		<p>💡 <strong>Tip:</strong> El ID de sesión aparece en cada mensaje que recibes (🔗 Sesión: chat_xxxx)</p>
-	</div>
+			<h3>💡 Cómo responder desde Telegram</h3>
+			<div class="notice notice-success">
+				<p><strong>Tienes 2 formas de responder:</strong></p>
+				<ol>
+					<li><strong>Responder al mensaje:</strong> Usa la función "Responder" de Telegram en el mensaje que recibiste</li>
+					<li><strong>Comando /reply:</strong> Escribe <code>/reply session_id tu_respuesta</code></li>
+				</ol>
+				<p>💡 <strong>Tip:</strong> El ID de sesión aparece en cada mensaje que recibes (🔗 Sesión: chat_xxxx)</p>
+			</div>
 
-	<h2>📋 Instrucciones Completas</h2>
-	<ol>
-		<li><strong>Crear bot:</strong> Habla con @BotFather en Telegram y envía <code>/newbot</code></li>
-		<li><strong>Obtener token:</strong> Copia el token que te da BotFather y pégalo arriba</li>
-		<li><strong>Obtener Chat ID:</strong> Envía un mensaje a @userinfobot para obtener tu ID</li>
-		<li><strong>Configurar webhook:</strong> Haz clic en "Configurar Webhook" arriba</li>
-		<li><strong>Probar:</strong> Envía un mensaje desde tu web y responde desde Telegram</li>
-		<li><strong>Personalizar:</strong> Ajusta colores y mensajes según tu marca</li>
-	</ol>
+			<h3>📖 Instrucciones Completas</h3>
+			<ol>
+				<li><strong>Crear bot:</strong> Habla con @BotFather en Telegram y envía <code>/newbot</code></li>
+				<li><strong>Obtener token:</strong> Copia el token que te da BotFather y pégalo en la pestaña "Telegram"</li>
+				<li><strong>Obtener Chat ID:</strong> Envía un mensaje a @userinfobot para obtener tu ID</li>
+				<li><strong>Configurar webhook:</strong> Haz clic en "Configurar Webhook" arriba</li>
+				<li><strong>Probar:</strong> Envía un mensaje desde tu web y responde desde Telegram</li>
+				<li><strong>Personalizar:</strong> Ajusta los colores y mensajes en la pestaña "Apariencia"</li>
+			</ol>
+		</div>
+
+		<?php submit_button( 'Guardar cambios', 'primary', 'submit' ); ?>
+	</form>
 </div>
 
+<style>
+	.nexgen-tabs {
+		display: flex;
+		gap: 10px;
+		margin: 20px 0;
+		border-bottom: 2px solid #ccc;
+		flex-wrap: wrap;
+	}
+
+	.nexgen-tab-button {
+		padding: 12px 20px;
+		background: #f0f0f0;
+		border: 2px solid transparent;
+		border-bottom: 3px solid transparent;
+		cursor: pointer;
+		font-size: 14px;
+		font-weight: 500;
+		transition: all 0.3s ease;
+		color: #333;
+	}
+
+	.nexgen-tab-button:hover {
+		background: #e0e0e0;
+	}
+
+	.nexgen-tab-button.active {
+		background: #fff;
+		border-bottom-color: #007cba;
+		color: #007cba;
+	}
+
+	.nexgen-tab-content {
+		display: none;
+		padding: 20px 0;
+		animation: fadeIn 0.3s ease;
+	}
+
+	.nexgen-tab-content.active {
+		display: block;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+</style>
+
 <script>
+function switchTab(event, tabName) {
+	event.preventDefault();
+
+	// Hide all tabs
+	const tabs = document.querySelectorAll('.nexgen-tab-content');
+	tabs.forEach(tab => {
+		tab.classList.remove('active');
+	});
+
+	// Remove active class from all buttons
+	const buttons = document.querySelectorAll('.nexgen-tab-button');
+	buttons.forEach(btn => {
+		btn.classList.remove('active');
+	});
+
+	// Show selected tab
+	document.getElementById(tabName).classList.add('active');
+
+	// Mark button as active
+	event.target.classList.add('active');
+
+	// Save tab preference to localStorage
+	localStorage.setItem('nexgen_active_tab', tabName);
+}
+
+// Restore last active tab on page load
+document.addEventListener('DOMContentLoaded', function() {
+	const lastTab = localStorage.getItem('nexgen_active_tab') || 'tab-telegram';
+	const tabButton = document.querySelector(`button[onclick="switchTab(event, '${lastTab}')"]`);
+	if (tabButton) {
+		tabButton.click();
+	}
+});
+
 function testTelegramConnection() {
 	const button = event.target;
 	const originalText = button.textContent;
@@ -270,6 +371,33 @@ function setupWebhook() {
 			alert('✅ ' + data.data + '\n\n🎉 ¡Ya puedes responder desde Telegram y se verá en el chat web!');
 		} else {
 			alert('❌ Error: ' + data.data);
+		}
+	})
+	.catch(err => alert('❌ Error de conexión: ' + err))
+	.finally(() => {
+		button.textContent = originalText;
+		button.disabled = false;
+	});
+}
+
+function testN8NConnection() {
+	const button = event.target;
+	const originalText = button.textContent;
+	button.textContent = 'Probando...';
+	button.disabled = true;
+
+	fetch(ajaxurl, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+		body: 'action=nexgen_test_n8n'
+	})
+	.then(r => r.json())
+	.then(data => {
+		if (data.success) {
+			const response = data.data.response ? '\n\n📝 Respuesta de N8N:\n' + data.data.response : '';
+			alert('✅ ' + data.data.message + response);
+		} else {
+			alert('❌ ' + data.data);
 		}
 	})
 	.catch(err => alert('❌ Error de conexión: ' + err))

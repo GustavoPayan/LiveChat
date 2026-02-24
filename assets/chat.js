@@ -152,7 +152,11 @@ jQuery(document).ready(function($) {
                 }
 
                 if (response.success) {
-                    addSystemMessage('Mensaje enviado. Responderemos pronto.');
+                    // Only show "we'll respond soon" message if NOT automated (N8N response)
+                    // If automated, the response will appear via polling
+                    if (!response.data.automated) {
+                        addSystemMessage('Mensaje enviado. Responderemos pronto.');
+                    }
                 } else {
                     const errorMsg = response.data || settings.error_message;
                     addMessage(errorMsg, 'bot');

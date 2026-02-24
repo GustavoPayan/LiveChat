@@ -43,6 +43,7 @@ class NexGen_Telegram_Chat {
 		// AJAX - Admin functions
 		add_action( 'wp_ajax_nexgen_debug_test', [ $this, 'handle_debug_test' ] );
 		add_action( 'wp_ajax_nexgen_set_webhook', [ $this, 'handle_set_webhook' ] );
+		add_action( 'wp_ajax_nexgen_test_n8n', [ $this, 'handle_test_n8n' ] );
 
 		// Activation hook
 		register_activation_hook( NEXGEN_CHAT_MAIN_FILE, [ $this, 'on_activate' ] );
@@ -412,6 +413,47 @@ class NexGen_Telegram_Chat {
 		} catch ( Exception $e ) {
 			NexGen_Security::log_event( 'set_webhook_error', [ 'error' => $e->getMessage() ] );
 			wp_send_json_error( $e->getMessage() );
+		}
+	}
+
+	/**
+	 * Test N8N webhook connection (AJAX handler)
+	 *
+	 * @return void
+	 */
+	public function handle_test_n8n() {
+		try {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( 'Sin permisos' );
+			}
+
+			$config = NexGen_N8N_Service::get_config();
+
+			if ( ! $config['enabled'] ) {
+				wp_send_json_error( 'N8N no está habilitado' );
+			}
+
+			if ( empty( $config['webhook_url'] ) ) {
+				wp_send_json_error( 'URL del webhook no configurada' );
+			}
+
+			// Send test message
+			$result = NexGen_N8N_Service::send_to_n8n(
+				'¿Tienes hosting?',
+				'chat_test_' . wp_generate_password( 6, false )
+			);
+
+			if ( ! $result['success'] ) {
+				wp_send_json_error( 'Error: ' . $result['error'] );
+			}
+
+			wp_send_json_success( [
+				'message'  => '✅ Conexión con N8N exitosa',
+				'response' => $result['response'],
+			] );
+		} catch ( Exception $e ) {
+			NexGen_Security::log_event( 'test_n8n_error', [ 'error' => $e->getMessage() ] );
+			wp_send_json_error( 'Error: ' . $e->getMessage() );
 		}
 	}
 
