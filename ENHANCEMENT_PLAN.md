@@ -62,237 +62,410 @@ wp_ajax_nexgen_process_message
 
 ---
 
-## Phase 3: Security Hardening
 
-### 3.1 Input Validation & Sanitization
-**Current gaps**:
-- `sanitize_text_field()` used, but limited
-- No rate limiting
-- Webhook data not fully validated
+## Phase 3: Security Hardening ⚔️ (CURRENT)
 
-**Improvements**:
+### 3.1 Rate Limiting (Prevent Spam & Abuse)
+**Implementation**:
 ```php
-// New validation class
-class Security {
-  public static function validate_message($msg, $max_length = 1000) {
-    // 1. Trim & empty check
-    // 2. Length validation
-    // 3. SQL injection test
-    // 4. XSS payload detection
-    // 5. Rate limit check (IP + session)
+// In NexGen_Security class
+public static function check_rate_limit($session_id, $limit = 20, $period = 60) {
+  $key = "nexgen_rate_limit_{$session_id}";
+  $count = get_transient($key);
+  
+  if ($count >= $limit) {
+    return [
+      'allowed' => false,
+      'message' => "Too many requests. Try again in {$period}s.",
+      'retry_after' => $period
+    ];
   }
   
-  public static function validate_telegram_update($payload) {
-    // Verify webhook signature if enabled
-    // Validate message structure
+  set_transient($key, ($count ?: 0) + 1, $period);
+  
+  return ['allowed' => true];
+}
+```
+**Where to use**: All message handlers before processing
+**Limits**: 20 messages per minute per session
+
+### 3.2 Input Validation & Sanitization
+**Current**: Basic `sanitize_text_field()`  
+**Upgrade**:
+```php
+// Enhanced validation
+public static function validate_message($message, $max_length = 1000) {
+  // 1. Type check
+  if (!is_string($message)) return ['valid' => false, 'error' => 'Invalid type'];
+  
+  // 2. Length check
+  if (strlen($message) > $max_length) return ['valid' => false, 'error' => 'Message too long'];
+  
+  // 3. Empty check
+  $trimmed = trim($message);
+  if (empty($trimmed)) return ['valid' => false, 'error' => 'Message cannot be empty'];
+  
+  // 4. XSS detection (block suspicious patterns)
+  $xss_patterns = ['<script', 'javascript:', 'onerror=', 'onclick=', 'onload='];
+  foreach ($xss_patterns as $pattern) {
+    if (stripos($trimmed, $pattern) !== false) {
+      return ['valid' => false, 'error' => 'Suspicious content detected'];
+    }
+  }
+  
+  return ['valid' => true, 'message' => sanitize_textarea_field($trimmed)];
+}
+```
+
+### 3.3 Webhook Signature Validation (Telegram)
+**Problem**: Anyone can POST to the webhook  
+**Solution**: Verify Telegram's X-Telegram-Bot-API-Secret-Token header
+```php
+public static function validate_telegram_webhook($token, $expected_token) {
+  $headers = getallheaders();
+  $received_token = $headers['X-Telegram-Bot-Api-Secret-Token'] ?? null;
+  
+  if (!hash_equals($token, $received_token ?? '')) {
+    NexGen_Security::log_event('webhook_signature_failed', ['received' => $received_token]);
+    wp_send_json_error('Invalid signature', 401);
+  }
+  
+  return true;
+}
+```
+
+### 3.4 Database Security
+**New columns**:
+- `ip_hash` (SHA256 of visitor IP, never raw IP for GDPR)
+- `is_suspicious` (flag for automated detection)
+- `sender_info` (JSON metadata: user-agent, referer, etc)
+
+**Auto-upgrade** (already implemented in Phase 2):
+```php
+public static function upgrade_table_schema() {
+  // Safely adds missing columns without data loss
+}
+```
+
+### 3.5 API Key Encryption
+**Current**: API keys stored in plaintext in wp_options  
+**Fix**: Encrypt sensitive data
+```php
+public static function encrypt_api_key($key) {
+  // Use WordPress's built-in encryption if available
+  // Or store in wp-config.php constants instead of DB
+  return base64_encode($key); // Minimal protection, upgrade to sodium later
+}
+
+public static function decrypt_api_key($encrypted) {
+  return base64_decode($encrypted);
+}
+```
+
+### 3.6 Enhanced Logging
+**Add to all critical operations**:
+```php
+NexGen_Security::log_event('security_event_type', [
+  'action' => 'message_received',
+  'session_id' => $session_id,
+  'message_length' => strlen($message),
+  'ip_hash' => hash('sha256', $_SERVER['REMOTE_ADDR']),
+  'timestamp' => current_time('mysql'),
+  'rate_limit_status' => $rate_limit['allowed'],
+  'is_n8n' => $should_go_to_n8n,
+]);
+```
+
+**Locations to add logging**:
+- ✅ Message received (log IP hash, content length, source)
+- ✅ Rate limit exceeded (potential DDoS)
+- ✅ Validation failures (XSS/SQL injection attempts)
+- ✅ Webhook signature failures
+- ✅ N8N errors (API issues)
+- ✅ Telegram API errors
+
+---
+
+## Phase 4: Context-Aware Chatbot (AI with Service Knowledge) 🧠
+
+### 4.1 Vision
+Transform from **simple keyword routing** to **intelligent LLM-powered assistant** that understands your service offerings, pricing, features, and can qualify leads.
+
+**Example Flow**:
+```
+User: "¿Cuál es el costo del desarrollo web?"
+↓
+N8N Flow:
+  1. Extract intent: "pricing inquiry"
+  2. Fetch context from WordPress: pricing, services, portfolio
+  3. Send to Gemini API: "User asks about web dev pricing. Our services: X, Y, Z. Our pricing: A, B, C. Respond professionally in Spanish"
+  4. Gemini responds with contextual answer
+  5. Save conversation to database for lead scoring
+↓
+User sees: "Nuestros servicios de desarrollo web comienzan en $X y incluyen..."
+```
+
+### 4.2 Data Sources for Context
+
+**Fetch from WordPress**:
+```php
+public static function gather_context() {
+  return [
+    'services' => self::get_services(),      // Custom post type or option
+    'pricing' => self::get_pricing_table(),  // Option or page
+    'features' => self::get_features(),      // From settings
+    'company' => [
+      'name' => get_bloginfo('name'),
+      'description' => get_bloginfo('description'),
+      'phone' => get_option('nexgen_company_phone'),
+      'email' => get_option('nexgen_company_email'),
+    ],
+    'portfolio' => self::get_recent_projects(), // Last 3 projects
+  ];
+}
+```
+
+**Store in admin settings**:
+- Service descriptions (textarea)
+- Pricing tiers (JSON)
+- Company info (name, phone, email, address)
+- Portfolio project names
+- Team member names/roles
+- FAQ entries
+
+### 4.3 N8N Workflow with Gemini Integration
+
+**N8N Setup**:
+```
+[Chat Message Input]
+    ↓
+[Extract Keywords/Intent] 
+    ↓
+[Fetch WordPress Context] → API call to /wp-json/nexgen/context
+    ↓
+[Call Gemini API] 
+    ├─ Model: gemini-1.5-pro
+    ├─ System Prompt: "You are a professional Spanish-speaking sales assistant for [Company]. Use provided context to answer."
+    ├─ Include Context: Services, Pricing, Company Info
+    ├─ User Message: Original question
+    └─ Temperature: 0.7 (balanced)
+    ↓
+[Save to Database]
+    ├─ Response text
+    ├─ Intent (extracted)
+    ├─ Lead quality score
+    └─ Contact info if extracted
+    ↓
+[Return Response to Chat]
+```
+
+### 4.4 N8N Security Best Practices
+
+**Webhook Security**:
+```
+1. Add Authentication:
+   - Use Bearer token in N8N webhook trigger
+   - Configure in WordPress: wp-json with API key
+   - Example: Authorization: Bearer nexgen_secret_token_xxxx
+
+2. Rate Limiting in N8N:
+   - Limit requests per IP
+   - Queue processing for high load
+   - Retry logic with exponential backoff
+
+3. API Keys:
+   - Store Gemini API key in N8N secrets/vault
+   - Never log or expose API key
+   - Rotate keys regularly
+```
+
+**N8N Node Configuration**:
+```json
+{
+  "name": "Fetch Context from WordPress",
+  "type": "httpRequest",
+  "typeVersion": 4,
+  "position": [250, 300],
+  "parameters": {
+    "url": "https://yoursite.com/wp-json/nexgen/context",
+    "requestMethod": "GET",
+    "authentication": "genericCredentialType",
+    "genericCredentials": "WordPress_API_Key",
+    "headers": {
+      "Authorization": "Bearer {{ $env.WORDPRESS_API_KEY }}"
+    }
   }
 }
 ```
 
-### 3.2 Rate Limiting
-**Implementation**:
-- Store rate limit data in transients: `nexgen_rate_limit_<sessionid>`
-- Limit: 20 messages per minute per session
-- Return 429 on exceed
+### 4.5 Lead Qualification & CRM Integration
 
-### 3.3 Webhook Security
-**Current issue**: Webhook accepts any POST, no signature validation  
-**Fix**:
-- Optional Telegram webhook signature validation
-- Required API key for N8N webhooks (encrypted)
-- Log all webhook attempts (success/failure)
+**Score leads based on**:
+- Service interest (e.g., "development" = high interest)
+- Urgency signals ("need it this week" = high)
+- Contact info provided (phone/email = higher quality)
 
-### 3.4 Database Security
-**Current**: Using `$wpdb->insert()` (good)  
-**Add**:
-- Column `ip_hash` (hashed IP, not raw IP for privacy)
-- Column `is_suspicious` flag
-- Audit log for admin actions
-- SQL injection test in unit tests
+```php
+public static function calculate_lead_quality($message, $response, $extracted_info) {
+  $score = 0;
+  
+  // Interest signals
+  if (isset($extracted_info['service_interest'])) $score += 30;
+  if (isset($extracted_info['budget_mentioned'])) $score += 20;
+  if (isset($extracted_info['timeline_mentioned'])) $score += 15;
+  if (isset($extracted_info['contact_info'])) $score += 35;
+  
+  return min($score, 100); // 0-100 score
+}
 
-### 3.5 CSRF Protection
-**Current**: Using `wp_verify_nonce()` (good)  
-**Ensure**:
-- All AJAX handlers check nonce (audit all actions)
-- Nonce refresh on long polling sessions
+// Store in database for CRM integration
+NexGen_Message_Service::save_message([
+  'session_id' => $session_id,
+  'message_text' => $message,
+  'sender_info' => json_encode([
+    'lead_score' => $lead_quality,
+    'intent' => $intent,
+    'extracted_contact' => $contact_info,
+    'interested_service' => $service,
+  ]),
+]);
+```
+
+### 4.6 WordPress REST API Endpoint for Context
+
+**New endpoint** `/wp-json/nexgen/context`:
+```php
+// Register in class-plugin.php admin_init()
+register_rest_route('nexgen/v1', '/context', [
+  'methods' => 'GET',
+  'callback' => [NexGen_Context_Service::class, 'get_context'],
+  'permission_callback' => function() {
+    return current_user_can('read') || wp_verify_nonce($_GET['nonce'], 'nexgen_context');
+  }
+]);
+```
+
+### 4.7 Conversation History for Better Context
+
+**If user asks follow-up questions**, include conversation history:
+```
+Gemini System Prompt:
+"You are a sales assistant. Here's the conversation history:
+
+User: ¿Cuál es el costo?
+Assistant: Our pricing starts at...
+
+User: ¿Incluye hosting?
+Assistant: [NEW] Yes, all packages include..."
+```
+
+**Database schema**:
+```
+wp_nexgen_chat_messages
+├── conversation_id (group related messages)
+├── message_order (sequence in conversation)
+├── llm_context_used (what data was sent to LLM)
+└── lead_data (extracted info)
+```
 
 ---
 
-## Phase 4: Code Quality & Best Practices
+## Phase 5: Code Quality & Best Practices
 
-### 4.1 PSR-12 Compliance
-- Add `.phpcs.xml` for PHP CodeSniffer
-- Use type hints: `function handle_message(string $msg, string $session_id): bool`
-- Add PHPDoc blocks
-
-### 4.2 Error Handling
-**Current**: `wp_send_json_error()` / `wp_send_json_success()`  
-**Improve**:
-```php
-try {
-  // Logic
-} catch (MessageException $e) {
-  error_log("NexGen Chat: " . $e->getMessage());
-  wp_send_json_error([
-    'code' => $e->getCode(),
-    'message' => $e->getMessage(),
-    'timestamp' => current_time('mysql')
-  ]);
-}
-```
-
-### 4.3 Logging System
-- Add `error_log()` calls for important events
-- Create debug mode in admin: `NEXGEN_CHAT_DEBUG = true`
-- Log file: `wp-content/plugins/nexgen-telegram-chat/logs/debug.log`
-- Include timestamp, action, user, result
-
-### 4.4 Type Hints & PHPDoc
+### 5.1 Type Hints & PHPDoc
+All methods should have:
 ```php
 /**
- * Save a message to the database
- * @param string $session_id  Unique session identifier
- * @param string $message     Message text (sanitized)
- * @param string $type        Message type: 'user', 'bot', 'system'
- * @param int|null $tg_msg_id Telegram message ID (optional)
- * @return int                Database insert ID
- * @throws MessageException   On database error
+ * Process and send message with AI enhancement
+ * 
+ * @param string $message User message (max 1000 chars)
+ * @param string $session_id Unique session ID (chat_*_hexcode)
+ * @return array Success response with ['response' => string, 'lead_score' => int]
+ * @throws MessageException On validation failure
  */
-public function save_message(
-  string $session_id,
-  string $message,
-  string $type,
-  ?int $tg_msg_id = null
-): int
+public static function process_with_ai(string $message, string $session_id): array
+```
+
+### 5.2 Error Handling
+```php
+try {
+  $validated = NexGen_Security::validate_message($message);
+  if (!$validated['valid']) throw new Exception($validated['error']);
+  
+  $response = NexGen_N8N_Service::send_to_n8n($message, $session_id);
+  if (!$response['success']) throw new Exception($response['error']);
+  
+  return ['success' => true, 'response' => $response['response']];
+} catch (Exception $e) {
+  NexGen_Security::log_event('message_process_error', ['error' => $e->getMessage()]);
+  return ['success' => false, 'error' => 'Failed to process message'];
+}
+```
+
+---
+
+## Phase 6: Frontend Improvements & Testing
+
+### 6.1 Modern JavaScript Architecture
+- Migrate from jQuery to Vanilla JS ES6 modules
+- Component-based: `ChatWidget`, `MessageRenderer`, `FormHandler`
+- Event-driven messaging
+
+### 6.2 Testing
+- Unit tests for validation functions
+- Integration tests for N8N flow
+- Security tests (XSS, SQL injection, rate limiting)
+
+---
+
+## Implementation Priority
+
+**Current (Phase 3-4)**:
+1. ✅ Implement rate limiting
+2. ✅ Add input validation
+3. ✅ Webhook signature validation
+4. 🔜 Build Gemini integration in N8N
+5. 🔜 Add WordPress context endpoint
+6. 🔜 Lead scoring system
+
+**Next (Phase 5-6)**:
+7. Code quality improvements
+8. Testing suite
+9. Frontend modernization
+10. Documentation
+
+---
+
+## File Structure After Phase 4
+
+```
+includes/
+  ├── class-plugin.php              # Main plugin (hooks)
+  ├── class-security.php            # Validation, rate limit, logging
+  ├── class-message-service.php     # DB operations
+  ├── class-telegram-service.php    # Telegram API
+  ├── class-n8n-service.php         # N8N routing
+  ├── class-context-service.php     # Context fetching for LLM (NEW)
+  ├── class-lead-service.php        # Lead scoring (NEW)
+  └── admin-page.php                # Settings UI
 ```
 
 ---
 
-## Phase 5: Frontend Improvements (Optional but Recommended)
+## Success Metrics for Phase 4
 
-### 5.1 Consider Modern Framework
-**Current**: jQuery (2012 standard)  
-**Options**:
-- **Keep jQuery** (less refactor, but outdated)
-- **Migrate to Vanilla JS** (modern, smaller bundle)
-- **Migrate to Vue 3** (reactive, maintainable, larger bundle ~30KB)
+✅ **Chatbot Quality**:
+- Response relevance score > 85%
+- Average response time < 3 seconds
+- User satisfaction score > 4/5
 
-**Recommendation**: Vanilla JS (vanilla-ajax + event listeners) = best balance
+✅ **Lead Quality**:
+- Lead qualification accuracy > 80%
+- Contact capture rate > 30%
+- Average lead score > 60
 
-### 5.2 Component Structure
-If staying with native JS:
-```javascript
-// ES6 modules
-export class ChatWidget {
-  constructor(options) { }
-  open() { }
-  close() { }
-  send() { }
-}
-
-export class MessageHandler {
-  static format(msg, type) { }
-  static validate(msg) { }
-}
-```
-
-### 5.3 Better Error UX
-- Show error type: "⚠️ Network error" vs "❌ Bot says: X"
-- Keyboard shortcuts (Ctrl+Enter to send)
-- Emoji picker for rich replies
-- Typing indicators
-
----
-
-## Phase 6: Documentation & Testing
-
-### 6.1 Documentation
-- Update `README.md` with architecture diagram
-- Add `ARCHITECTURE.md` (services, data flow)
-- Add `SECURITY.md` (encryption, validation, rate limits)
-- Add `DEVELOPER.md` (setup, testing, debugging)
-- Update `.github/copilot-instructions.md` with new services
-
-### 6.2 Basic Testing
-- Unit tests for `Message Service` (save, retrieve, delete)
-- Integration tests for Telegram webhook
-- Security tests (rate limit, XSS payloads, SQL injection)
-- Use PHPUnit
-
----
-
-## Implementation Roadmap
-
-### Sprint 1 (Week 1-2): Security + Architecture
-1. ✅ Create service classes (Message, Telegram, Session)
-2. ✅ Add input validation & sanitization library
-3. ✅ Implement rate limiting (transients)
-4. ✅ Add Webhook signature validation
-5. ✅ Update DB schema (add `ip_hash`)
-
-### Sprint 2 (Week 3-4): N8N Integration
-1. ✅ Create N8N service class
-2. ✅ Add admin settings for N8N
-3. ✅ Implement message classification (keyword-based)
-4. ✅ Route messages (bot → N8N or Telegram)
-5. ✅ Add fallback logic
-
-### Sprint 3 (Week 5-6): Code Quality
-1. ✅ Add logging system
-2. ✅ Type hints for all methods
-3. ✅ PHPDoc blocks
-4. ✅ Error handling refactor
-5. ✅ Add `.phpcs.xml`
-
-### Sprint 4 (Week 7): Frontend & Polish
-1. ✅ Optional: Migrate jQuery → Vanilla JS
-2. ✅ Improve error messages
-3. ✅ Add typing indicators UI
-4. ✅ Test on multiple browsers
-
-### Sprint 5 (Week 8): Testing & Docs
-1. ✅ Write unit tests
-2. ✅ Write documentation
-3. ✅ Create architecture diagrams
-4. ✅ Release v3.0.0
-
----
-
-## File Size Estimates
-
-| File | Current LOC | After Refactor | Change |
-|------|-------------|-----------------|--------|
-| nexgen-telegram-chat.php | 730 | 150 | -80% ✓ |
-| (new) class-plugin.php | - | 120 | - |
-| (new) class-message-service.php | - | 180 | - |
-| (new) class-telegram-service.php | - | 150 | - |
-| (new) class-n8n-service.php | - | 120 | - |
-| (new) class-security.php | - | 100 | - |
-| assets/chat.js | 380 | 350 | -8% |
-| assets/chatbot.css | 339 | 380 | +12% |
-| **Total** | **1449** | **1550** | **+7%** |
-
----
-
-## Security Checklist
-
-- [ ] All inputs sanitized with type validation
-- [ ] Rate limiting implemented (20 msg/min per session)
-- [ ] CSRF nonces on all AJAX endpoints
-- [ ] Webhook signature validation (opt-in)
-- [ ] IP-based DDoS protection via rate limits
-- [ ] Sensitive data (API keys) hashed/encrypted
-- [ ] SQL injection tests passing
-- [ ] XSS payload tests passing
-- [ ] Log all security events
-- [ ] Admin-only functions guarded with `current_user_can()`
-
----
-
-## Next Steps
-
-1. **Do you want me to start with Phase 1 (Architecture Refactor)?**
-2. **Priority on N8N integration or security hardening first?**
-3. **Any specific N8N workflows you already have?** (e.g., FAQ bot, lead capture)
-4. **Timeline constraints?**
+✅ **System Health**:
+- Uptime > 99.5%
+- Error rate < 0.1%
+- API cost optimization (batching, caching)
 

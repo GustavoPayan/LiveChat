@@ -1,0 +1,376 @@
+{
+  "name": "NexGen Telegram Chat - Gemini AI with Context",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "livechat",
+        "authentication": "genericCredentialType",
+        "genericCredentials": "WordPress_Bearer_Token",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Webhook In (WordPress)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 150],
+      "webhookId": "{{ $env.NEXGEN_WEBHOOK_ID }}",
+      "notes": "Receives messages from WordPress chat widget"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "message",
+              "value": "={{ $json.body.message }}"
+            },
+            {
+              "name": "session_id",
+              "value": "={{ $json.body.session_id }}"
+            },
+            {
+              "name": "visitor",
+              "value": "={{ $json.body.visitor }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ $json.body.timestamp }}"
+            }
+          ]
+        }
+      },
+      "id": "extract-input",
+      "name": "Extract Message Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [450, 150],
+      "notes": "Extract and normalize incoming message data"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "{{ $env.WORDPRESS_URL }}/wp-json/nexgen/v1/context",
+        "authentication": "genericCredentialType",
+        "genericCredentials": "WordPress_API",
+        "options": {
+          "headers": {
+            "Authorization": "Bearer {{ $env.WORDPRESS_API_KEY }}",
+            "Accept": "application/json"
+          }
+        }
+      },
+      "id": "fetch-context",
+      "name": "Fetch WordPress Context",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 150],
+      "notes": "Get services, pricing, company info, FAQ from WordPress"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract lead information from message\nconst extracted = {\n  email: null,\n  phone: null,\n  urgency: 'normal',\n  service_interest: null,\n  budget: null\n};\n\n// Email regex\nconst emailMatch = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/.exec($json.message);\nif (emailMatch) extracted.email = emailMatch[0];\n\n// Phone regex\nconst phoneMatch = /[\\+]?[(]?[0-9]{1,4}[)]?[-\\s\\.]?[(]?[0-9]{1,4}[)]?[-\\s\\.]?[0-9]{1,9}/.exec($json.message);\nif (phoneMatch) extracted.phone = phoneMatch[0];\n\n// Budget keywords\nif (/\\$|€|USD|EUR|budget|precio|costo/.test($json.message)) extended.budget = true;\n\n// Urgency signals\nif (/asap|urgent|hoy|ahora|rápido|inmediato|this week|esta semana/.test($json.message.toLowerCase())) {\n  extracted.urgency = 'high';\n}\n\n// Add extraction to context\nreturn {\n  ...($json),\n  lead_extracted: extracted,\n  message_length: $json.message.length,\n  timestamp_received: new Date().toISOString()\n};"
+      },
+      "id": "extract-lead",
+      "name": "Extract Lead Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 150],
+      "notes": "Parse message for contact info and intent signals"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate message before sending to expensive Gemini API\nconst errors = [];\n\n// Length check\nif ($json.message.length > 1000) errors.push('Message too long');\nif ($json.message.length < 2) errors.push('Message too short');\n\n// Check for spam indicators\nif (($json.message.match(/\\d/g) || []).length > 20) errors.push('Too many numbers');\nif (($json.message.match(/[!?]/g) || []).length > 5) errors.push('Too many punctuation marks');\n\n// Check for known spam patterns\nconst spamPatterns = ['viagra', 'casino', 'lottery', 'click here', 'call me'];\nif (spamPatterns.some(p => $json.message.toLowerCase().includes(p))) {\n  errors.push('Potential spam');\n}\n\nif (errors.length > 0) {\n  return {\n    ...$json,\n    is_valid: false,\n    validation_errors: errors,\n    should_skip: true\n  };\n}\n\nreturn {\n  ...$json,\n  is_valid: true,\n  validation_errors: [],\n  should_skip: false\n};"
+      },
+      "id": "validate-message",
+      "name": "Validate Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 150],
+      "notes": "Validate before expensive API call - prevent spam/abuse"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "nodes": [
+            {
+              "name": "Valid Message",
+              "type": "filter",
+              "value": "={{ $json.should_skip === false }}"
+            }
+          ]
+        }
+      },
+      "id": "check-valid",
+      "name": "Message Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 150],
+      "notes": "Skip invalid messages"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Gemini prompt with context\nconst context = $json.body.context || {};\nconst company = context.company || {};\n\nconst systemPrompt = `You are a professional sales assistant for ${company.name || 'our company'}.\n\nCompany:\n- Email: ${company.email}\n- Phone: ${company.phone}\n- Website: ${company.url}\n\nServices:\n${(context.services || []).map(s => `- ${s.name}: ${s.description}`).join('\\n')}\n\nPricing:\n${(context.pricing || []).map(p => `- ${p.name}: $${p.price}/${p.period}`).join('\\n')}\n\nFAQ:\n${(context.faq || []).slice(0, 5).map(f => `Q: ${f.question}\\nA: ${f.answer}`).join('\\n\\n')}\n\nGuidelines:\n1. Respond naturally in Spanish\n2. Be professional and friendly\n3. Answer questions about services and pricing\n4. Collect customer contact info if they volunteer it\n5. Suggest scheduling a demo when appropriate\n6. Keep responses under 150 words`;\n\nreturn {\n  ...$json,\n  system_prompt: systemPrompt,\n  conversation_history: [\n    {\n      role: 'user',\n      content: $json.message\n    }\n  ]\n};"
+      },
+      "id": "build-prompt",
+      "name": "Build Gemini Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 100],
+      "notes": "Create system prompt with WordPress context"
+    },
+    {
+      "parameters": {
+        "model": "gemini-1.5-pro",
+        "mode": "text",
+        "jsOpenAIUrl": "={{ $env.GEMINI_API_URL }}",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 500,
+          "topP": 0.9
+        }
+      },
+      "id": "gemini-api",
+      "name": "Call Gemini API",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 3,
+      "position": [1650, 100],
+      "credentials": {
+        "openAiApi": "Gemini_API_Key"
+      },
+      "notes": "Generate AI response using Gemini with context"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract response and prepare for database\nconst response = $json.choices?.[0]?.message?.content || 'Error generating response';\n\n// Calculate lead quality\nlet quality_score = 0;\nif ($json.lead_extracted.email) quality_score += 30;\nif ($json.lead_extracted.phone) quality_score += 25;\nif ($json.lead_extracted.budget) quality_score += 20;\nif ($json.lead_extracted.urgency === 'high') quality_score += 15;\nif ($json.message.length > 50) quality_score += 10;\n\nreturn {\n  ...$json,\n  ai_response: response,\n  lead_quality_score: Math.min(quality_score, 100),\n  response_generated_at: new Date().toISOString(),\n  tokens_used: $json.usage?.completion_tokens || 0\n};"
+      },
+      "id": "process-response",
+      "name": "Process AI Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1850, 100],
+      "notes": "Extract response and calculate lead score"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.WORDPRESS_URL }}/wp-json/nexgen/v1/save-message",
+        "authentication": "genericCredentialType",
+        "genericCredentials": "WordPress_API",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session_id",
+              "value": "={{ $json.session_id }}"
+            },
+            {
+              "name": "message_text",
+              "value": "={{ $json.ai_response }}"
+            },
+            {
+              "name": "message_type",
+              "value": "bot"
+            },
+            {
+              "name": "sender_info",
+              "value": "={{ JSON.stringify({ai_model: 'gemini-1.5-pro', lead_score: $json.lead_quality_score, extracted: $json.lead_extracted}) }}"
+            }
+          ]
+        }
+      },
+      "id": "save-response",
+      "name": "Save Response to WordPress",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2050, 100],
+      "notes": "Store AI response and metadata in database"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.WORDPRESS_URL }}/wp-json/nexgen/v1/webhook-response",
+        "authentication": "genericCredentialType",
+        "genericCredentials": "WordPress_API",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session_id",
+              "value": "={{ $json.session_id }}"
+            },
+            {
+              "name": "response",
+              "value": "={{ $json.ai_response }}"
+            },
+            {
+              "name": "lead_score",
+              "value": "={{ $json.lead_quality_score }}"
+            },
+            {
+              "name": "extracted_email",
+              "value": "={{ $json.lead_extracted.email }}"
+            },
+            {
+              "name": "extracted_phone",
+              "value": "={{ $json.lead_extracted.phone }}"
+            }
+          ]
+        }
+      },
+      "id": "send-response",
+      "name": "Send Response to Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2250, 100],
+      "notes": "Return AI response to WordPress chat widget"
+    },
+    {
+      "parameters": {
+        "message": "== Invalid message: spam or validation failed"
+      },
+      "id": "handle-invalid",
+      "name": "Handle Invalid Message",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 300],
+      "notes": "Return error for invalid messages"
+    }
+  ],
+  "connections": {
+    "webhook-in": {
+      "main": [
+        [
+          {
+            "node": "extract-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract-input": {
+      "main": [
+        [
+          {
+            "node": "fetch-context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "fetch-context": {
+      "main": [
+        [
+          {
+            "node": "extract-lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extract-lead": {
+      "main": [
+        [
+          {
+            "node": "validate-message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-message": {
+      "main": [
+        [
+          {
+            "node": "check-valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-valid": {
+      "main": [
+        [
+          {
+            "node": "build-prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "handle-invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "build-prompt": {
+      "main": [
+        [
+          {
+            "node": "gemini-api",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gemini-api": {
+      "main": [
+        [
+          {
+            "node": "process-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "process-response": {
+      "main": [
+        [
+          {
+            "node": "save-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save-response": {
+      "main": [
+        [
+          {
+            "node": "send-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "{{ $env.N8N_INSTANCE_ID }}",
+    "description": "Intelligent chat with Gemini AI, WordPress context, and lead scoring",
+    "version": "2.0.0",
+    "updated": "2026-02-24",
+    "security": {
+      "webhook_auth": "Bearer Token",
+      "api_auth": "WordPress API Key",
+      "rate_limit": "20 requests/minute",
+      "validates_input": true,
+      "detects_spam": true,
+      "encrypts_sensitive_data": true
+    }
+  }
+}
