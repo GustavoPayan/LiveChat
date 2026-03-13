@@ -1,84 +1,134 @@
-# 📌 LiveChat – WordPress Chat Plugin Powered by Telegram
+# � NexGen Telegram Chat - WordPress Plugin v3.0
 
-## 🧠 What is this project?
-
-LiveChat is a **WordPress plugin** that allows you to add a **live chat system to your website**, using **Telegram** as the real-time messaging platform to receive and respond to messages from site visitors. ([GitHub][1])
-
-This plugin is designed for developers or site owners who want to:
-
-* Receive real-time messages from their website directly in **Telegram**.
-* Manage conversations from their phone or Telegram desktop client.
-* Provide support or customer assistance without relying on third-party chat services.
+Plugin bidireccional de chat para WordPress con integración a Telegram Bot, N8N workflows y IA Gemini.
 
 ---
 
-## 🚀 How does it work?
+## 📋 Inicio Rápido
 
-1. The plugin is installed as a component within WordPress.
-2. It integrates a live chat interface on the website for visitors.
-3. It can be customized in colors and text from the WordPress admin panel.
-4. When a visitor sends a message:
+### 1. Instalación del Plugin
+```bash
+# Copiar a WordPress
+cp -r . /wp-content/plugins/nexgen-telegram-chat/
+# Activar en WordPress Admin
+```
 
-   * The message is forwarded to a **Telegram account**.
-   * You (or your team) can reply directly from Telegram.
-5. The plugin handles bidirectional communication between your website and Telegram.
+### 2. Configurar N8N + Gemini
+**Guía completa:** [N8N_IMPORT_GUIDE.md](N8N_IMPORT_GUIDE.md)
 
----
+**Pasos rápidos:**
+```
+1. Importar: n8n-simple-workflow.json
+2. Variables: GEMINI_API_KEY, WORDPRESS_URL, WORDPRESS_API_KEY
+3. Activar workflow
+4. Listo ✓
+```
 
-## 🗂️ What does this repository include?
-
-| File                                     | Description                                                               |
-| ---------------------------------------- | ------------------------------------------------------------------------- |
-| `nexgen-telegram-chat.php`               | Main plugin file that connects WordPress with Telegram.                   |
-| `assets/`                                | Contains JS and CSS files for backend functionality and frontend styling. |
-
----
-
-## 🛠️ Technologies Used
-
-* **PHP** – Plugin backend for WordPress.
-* **JavaScript & CSS** – Chat interactivity and frontend styling.
+### 3. Configuración en WordPress
+Panel Admin → Configuración → NexGen Chat
 
 ---
 
-## 🧩 Installation (for end users)
+## 🏗️ Arquitectura
 
-1. Download the full repository as a ZIP file.
-2. From your WordPress dashboard, go to **Plugins → Add New**.
-3. Upload the ZIP file and activate the plugin.
-4. Configure the plugin using your **Telegram bot/token** (required for the chat to work).
+**Service-Oriented Design (v3.0+)**
 
-> ⚠️ Make sure you have a Telegram bot created to receive messages. (You can use BotFather to create one.)
+```
+includes/
+├── class-plugin.php           (Hooks principales)
+├── class-security.php         (Validación, rate limiting)
+├── class-session-service.php  (Gestión de cookies)
+├── class-message-service.php  (BD - CRUD)
+├── class-telegram-service.php (API Telegram)
+├── class-n8n-service.php      (Workflow N8N)
+├── class-context-service.php  (Contexto empresa)
+└── class-n8n-endpoints.php    (REST API)
 
----
-
-## 🎯 Benefits
-
-✔ Enables **live support without relying on external chat providers**.
-✔ Centralizes visitor communication directly in **Telegram**.
-✔ Easy to install and use on any WordPress website.
-
----
-
-## ✨ Features
-
-* Live chat integration for WordPress
-* Telegram-based real-time messaging
-* Lightweight and easy to install
-* No third-party chat services required
-* Ideal for customer support or lead capture
+assets/
+├── chat.js         (Frontend - AJAX, polling)
+└── chatbot.css     (Estilos)
+```
 
 ---
 
-## 🛣️ Roadmap
+## 🔌 REST API Endpoints
 
-* [ ] Improve settings page
-* [ ] Support for multiple Telegram users
-* [ ] Chat history storage  
-* [ ] Custom UI themes
+Todos requieren: `Authorization: Bearer {WORDPRESS_API_KEY}`
+
+```
+POST   /wp-json/nexgen/v1/n8n-message        Recibir mensajes desde N8N
+GET    /wp-json/nexgen/v1/context            Obtener contexto (servicios, precios)
+POST   /wp-json/nexgen/v1/save-message       Guardar respuesta bot
+POST   /wp-json/nexgen/v1/webhook-response   Enviar respuesta al chat
+```
 
 ---
 
-> LiveChat is a WordPress plugin I developed to integrate a live chat system into any website, connecting it with Telegram to send and receive messages in real time. It is built with PHP and JavaScript, designed to be lightweight and easy to configure. Visitors can start a conversation from the website, and I can respond directly from Telegram, making support more flexible and accessible.
+## 📊 Flujo Completo
+
+```
+Chat Widget → WordPress → N8N Webhook → Gemini API
+                ↓
+          Procesar respuesta
+                ↓
+          Guardar en BD  
+                ↓
+          Mostrar en chat ✓
+```
+
+---
+
+## 🔐 Seguridad
+
+✅ Validación de nonce (XSS protection)
+✅ Validación de mensajes (spam, length)
+✅ Rate limiting (20 msgs/min)
+✅ Bearer token auth
+✅ Prepared statements (SQL injection)
+✅ Cookies httponly (no interfiere REST API)
+
+---
+
+## 📁 Archivos Principales
+
+| Archivo | Descripción |
+|---------|------------|
+| `nexgen-telegram-chat.php` | Bootstrap principal |
+| `n8n-simple-workflow.json` | Flujo N8N (importar en n8n) |
+| `N8N_IMPORT_GUIDE.md` | Guía importación N8N |
+| `.env.example` | Template variables |
+| `SESSION_FIX_CHANGELOG.md` | Fix sesiones PHP |
+
+---
+
+## 🧪 Testing
+
+```bash
+# Test API Context
+curl https://tu-sitio.com/wp-json/nexgen/v1/context \
+  -H "Authorization: Bearer TU-API-KEY"
+
+# Test Gemini
+curl -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=TU-KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"contents":[{"parts":[{"text":"Hola"}]}]}'
+```
+
+---
+
+## 📚 Documentación
+
+- [N8N_IMPORT_GUIDE.md](N8N_IMPORT_GUIDE.md) - Guía N8N
+- [SESSION_FIX_CHANGELOG.md](SESSION_FIX_CHANGELOG.md) - Fix sesiones
+- [.env.example](.env.example) - Configuración
+
+---
+
+## ✨ Versión
+
+- **Version:** 3.0.0+
+- **PHP:** 7.4+
+- **WordPress:** 5.0+
+- **Status:** Production Ready ✅
 
 ---

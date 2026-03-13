@@ -24,6 +24,7 @@ require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-session-service.php';
 require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-message-service.php';
 require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-telegram-service.php';
 require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-n8n-service.php';
+require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-n8n-endpoints.php';
 require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-plugin.php';
 
 // Initialize plugin
