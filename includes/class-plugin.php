@@ -84,7 +84,7 @@ class NexGen_Telegram_Chat {
 			'nexgen-chat-js',
 			NEXGEN_CHAT_PLUGIN_URL . 'assets/chat.js',
 			[ 'jquery' ],
-			'2.1.0',
+			'3.2.0',
 			true
 		);
 
@@ -92,7 +92,7 @@ class NexGen_Telegram_Chat {
 			'nexgen-chat-css',
 			NEXGEN_CHAT_PLUGIN_URL . 'assets/chatbot.css',
 			[],
-			'2.1.0'
+			'3.2.0'
 		);
 
 		// Localize script with settings

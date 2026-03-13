@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexGen Chatbot - Preview Diseño</title>
+    <style>
+        /* ====================================================
+           NexGen Chatbot - Enterprise Styles v3.2
+           Clean, Professional Design with Flexible Colors
+           ==================================================== */
+
+        :root {
+            --primary-color: #007cba;
+            --secondary-color: #00ba7c;
+            --background-color: #ffffff;
+            --text-primary: #1a202c;
+            --text-secondary: #626970;
+            --border-light: #e2e8f0;
+            --bg-light: #f7fafc;
+            --radius-sm: 6px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+            --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.15);
+            --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .demo-section {
+            margin-bottom: 40px;
+        }
+
+        .demo-section h2 {
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .preview-wrapper {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 600px;
+        }
+
+        /* ====== CHAT TOGGLE BUTTON ====== */
+        .nexgen-chatbot-toggle {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border: none;
+            box-shadow: var(--shadow-lg);
+            transition: all var(--transition-smooth);
+            color: white;
+            position: fixed;
+            font-size: 0;
+            overflow: hidden;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        .nexgen-chatbot-toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .nexgen-chatbot-toggle:active {
+            transform: translateY(0);
+        }
+
+        .nexgen-chatbot-toggle svg {
+            width: 24px;
+            height: 24px;
+            transition: transform var(--transition-base);
+            font-size: 24px;
+        }
+
+        .nexgen-chatbot-toggle .close-icon {
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 0.5px;
+        }
+
+        /* ====== NOTIFICATION BADGE ====== */
+        .nexgen-notification-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+            animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            opacity: 1;
+            transform: scale(1);
+            transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes pulse-soft {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.08); opacity: 0.9; }
+        }
+
+        /* ====== CHAT WINDOW ====== */
+        .nexgen-chatbot-window {
+            position: absolute;
+            bottom: 70px;
+            right: 40px;
+            width: 380px;
+            height: 550px;
+            background: var(--background-color);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: slideUpIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes slideUpIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes slideDownOut {
+            from {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(8px) scale(0.96);
+            }
+        }
+
+        .nexgen-chatbot-window.nexgen-exit {
+            opacity: 0;
+            transform: translateY(8px) scale(0.96);
+            animation: slideDownOut 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        /* ====== HEADER ====== */
+        .nexgen-chatbot-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0;
+        }
+
+        .nexgen-chatbot-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            line-height: 1.4;
+        }
+
+        .nexgen-chatbot-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* ====== STATUS INDICATOR ====== */
+        .nexgen-status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0.95;
+        }
+
+        .nexgen-status-dot {
+            width: 8px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* ====== CLOSE BUTTON ====== */
+        .nexgen-chatbot-close {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-md);
+            transition: all var(--transition-base);
+            flex-shrink: 0;
+        }
+
+        .nexgen-chatbot-close:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .nexgen-chatbot-close:active {
+            transform: scale(0.95);
+        }
+
+        /* ====== MESSAGE AREA ====== */
+        .nexgen-chatbot-messages {
+            flex: 1;
+            padding: 20px 16px;
+            overflow-y: auto;
+            background: var(--bg-light);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nexgen-chatbot-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .nexgen-chatbot-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .nexgen-chatbot-messages::-webkit-scrollbar-thumb {
+            background: var(--border-light);
+            border-radius: 3px;
+            transition: background var(--transition-base);
+        }
+
+        .nexgen-chatbot-messages::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e0;
+        }
+
+        /* ====== MESSAGES ====== */
+        .nexgen-message {
+            margin-bottom: 2px;
+            display: flex;
+            flex-direction: column;
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+                        transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .nexgen-message.nexgen-message-entering {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+
+        .nexgen-message-content {
+            max-width: 82%;
+            padding: 10px 14px;
+            border-radius: var(--radius-md);
+            word-wrap: break-word;
+            line-height: 1.5;
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 0.2px;
+        }
+
+        /* ====== USER MESSAGE ====== */
+        .nexgen-user-message {
+            align-self: flex-end;
+        }
+
+        .nexgen-user-message .nexgen-message-content {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            border-radius: 18px 18px 4px 18px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ====== BOT MESSAGE ====== */
+        .nexgen-bot-message {
+            align-self: flex-start;
+        }
+
+        .nexgen-bot-message .nexgen-message-content {
+            background: white;
+            color: var(--text-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 18px 18px 18px 4px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ====== MESSAGE TIME ====== */
+        .nexgen-message-time {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            align-self: flex-end;
+            font-weight: 400;
+            opacity: 0.8;
+        }
+
+        .nexgen-bot-message .nexgen-message-time {
+            align-self: flex-start;
+        }
+
+        /* ====== INPUT AREA ====== */
+        .nexgen-chatbot-input-area {
+            padding: 16px;
+            background: var(--background-color);
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-shrink: 0;
+        }
+
+        .nexgen-chatbot-input-area input {
+            flex: 1;
+            border: 1px solid var(--border-light);
+            border-radius: 24px;
+            padding: 11px 16px;
+            font-size: 14px;
+            font-weight: 400;
+            color: var(--text-primary);
+            background: white;
+            outline: none;
+            transition: all var(--transition-base);
+            resize: none;
+            max-height: 100px;
+        }
+
+        .nexgen-chatbot-input-area input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(0, 124, 186, 0.08);
+        }
+
+        .nexgen-chatbot-input-area input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        /* ====== SEND BUTTON ====== */
+        .nexgen-chatbot-input-area button {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-base);
+            flex-shrink: 0;
+            font-size: 18px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .nexgen-chatbot-input-area button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .nexgen-chatbot-input-area button:active:not(:disabled) {
+            transform: translateY(0) scale(0.95);
+        }
+
+        .nexgen-chatbot-input-area button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ====== TYPING INDICATOR ====== */
+        .nexgen-chatbot-typing {
+            padding: 12px 16px;
+            background: var(--bg-light);
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 400;
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .nexgen-typing-indicator {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .nexgen-typing-indicator span {
+            width: 6px;
+            height: 6px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: typing-bounce 1.4s infinite ease-in-out;
+            opacity: 0.6;
+        }
+
+        .nexgen-typing-indicator span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .nexgen-typing-indicator span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        .nexgen-typing-indicator span:nth-child(3) {
+            animation-delay: 0s;
+        }
+
+        @keyframes typing-bounce {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.6;
+            }
+            30% {
+                transform: translateY(-8px);
+                opacity: 1;
+            }
+        }
+
+        /* ====== RESPONSIVE DESIGN ====== */
+        @media (max-width: 768px) {
+            .nexgen-chatbot-window {
+                width: calc(100vw - 40px);
+                height: calc(100vh - 140px);
+                max-width: 380px;
+                max-height: 600px;
+            }
+        }
+
+        /* Color scheme selector */
+        .color-selector {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .color-selector h3 {
+            margin-bottom: 15px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .color-options {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .color-option {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .color-swatch {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .color-option input:checked + .color-swatch {
+            border-color: var(--text-primary);
+            box-shadow: 0 0 0 2px white, 0 0 0 4px var(--text-primary);
+        }
+
+        .color-option label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .color-option input {
+            display: none;
+        }
+
+        /* Info panel */
+        .info-panel {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }
+
+        .info-panel h3 {
+            margin-bottom: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .info-panel p {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .info-panel ul {
+            list-style: none;
+            padding: 0;
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .info-panel li:before {
+            content: "✓ ";
+            color: var(--secondary-color);
+            font-weight: bold;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Info Panel -->
+        <div class="info-panel">
+            <h3>🎨 NexGen Chatbot - Enterprise Design Preview</h3>
+            <p>Este es un preview en tiempo real del diseño del chatbot. Puedes cambiar los colores usando los controles de abajo y ver cómo el diseño se adapta instantáneamente.</p>
+            <ul>
+                <li>Transiciones suaves y profesionales</li>
+                <li>Colores totalmente configurables desde CSS variables</li>
+                <li>Diseño responsivo para móvil y desktop</li>
+                <li>Accesibilidad WCAG compliant</li>
+            </ul>
+        </div>
+
+        <!-- Color Selector -->
+        <div class="color-selector">
+            <h3>Esquema de Colores (Prueba diferentes combinaciones)</h3>
+            <div class="color-options">
+                <div class="color-option">
+                    <input type="radio" id="color-blue" name="colorScheme" value="blue" checked>
+                    <label for="color-blue">Azul Profesional</label>
+                </div>
+                <div class="color-option">
+                    <input type="radio" id="color-purple" name="colorScheme" value="purple">
+                    <label for="color-purple">Púrpura Premium</label>
+                </div>
+                <div class="color-option">
+                    <input type="radio" id="color-emerald" name="colorScheme" value="emerald">
+                    <label for="color-emerald">Esmeralda Verde</label>
+                </div>
+                <div class="color-option">
+                    <input type="radio" id="color-orange" name="colorScheme" value="orange">
+                    <label for="color-orange">Naranja Energético</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview -->
+        <div class="demo-section">
+            <h2>Preview en Vivo</h2>
+            <div class="preview-wrapper">
+                <!-- Chat Window -->
+                <div class="nexgen-chatbot-window">
+                    <!-- Header -->
+                    <div class="nexgen-chatbot-header">
+                        <div>
+                            <h3>NexGen Chat</h3>
+                            <div class="nexgen-status-indicator">
+                                <span class="nexgen-status-dot"></span>
+                                <span>En línea</span>
+                            </div>
+                        </div>
+                        <button class="nexgen-chatbot-close" title="Cerrar">✕</button>
+                    </div>
+
+                    <!-- Messages -->
+                    <div class="nexgen-chatbot-messages">
+                        <div class="nexgen-message nexgen-bot-message">
+                            <div class="nexgen-message-content">¡Hola! 👋 Bienvenido a NexGen Chat. ¿En qué puedo ayudarte hoy?</div>
+                            <div class="nexgen-message-time">10:34</div>
+                        </div>
+
+                        <div class="nexgen-message nexgen-user-message">
+                            <div class="nexgen-message-content">Hola, tengo una pregunta sobre el producto.</div>
+                            <div class="nexgen-message-time">10:35</div>
+                        </div>
+
+                        <div class="nexgen-message nexgen-bot-message">
+                            <div class="nexgen-message-content">Por supuesto, estaré encantado de ayudarte. Cuéntame más detalles sobre lo que necesitas. 😊</div>
+                            <div class="nexgen-message-time">10:35</div>
+                        </div>
+
+                        <div class="nexgen-message nexgen-user-message">
+                            <div class="nexgen-message-content">¿Cuál es el precio de la suscripción premium?</div>
+                            <div class="nexgen-message-time">10:36</div>
+                        </div>
+
+                        <div class="nexgen-message nexgen-bot-message">
+                            <div class="nexgen-message-content">La suscripción premium tiene un costo de $9.99 USD al mes. Incluye todas las características avanzadas. 💎</div>
+                            <div class="nexgen-message-time">10:36</div>
+                        </div>
+
+                        <!-- Typing indicator -->
+                        <div class="nexgen-chatbot-typing">
+                            <span>El equipo está escribiendo</span>
+                            <div class="nexgen-typing-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Area -->
+                    <div class="nexgen-chatbot-input-area">
+                        <input type="text" placeholder="Escribe tu mensaje..." value="">
+                        <button title="Enviar mensaje">➤</button>
+                    </div>
+                </div>
+
+                <!-- Toggle Button -->
+                <button class="nexgen-chatbot-toggle" title="Abrir chat">
+                    <span class="chat-icon">💬</span>
+                    <span class="close-icon" style="display: none;">✕</span>
+                    <div class="nexgen-notification-badge">1</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Features -->
+        <div class="demo-section">
+            <h2>Características del Diseño</h2>
+            <div class="info-panel">
+                <h3>✨ Elementos Visuales Enterprise</h3>
+                <ul>
+                    <li><strong>Tipografía profesional:</strong> Sistema con anti-aliasing y pesos de fuente consistentes</li>
+                    <li><strong>Sombras elegantes:</strong> Sistema de elevación (sm, md, lg, xl) para profundidad visual</li>
+                    <li><strong>Espaciado armónico:</strong> Grid de 8px para consistencia visual</li>
+                    <li><strong>Transiciones fluidas:</strong> Cubic-bezier personalizado para movimientos naturales</li>
+                    <li><strong>Estados interactivos:</strong> Hover, active, disabled con retroalimentación visual</li>
+                    <li><strong>Colores configurables:</strong> CSS variables que se adaptan dinámicamente</li>
+                    <li><strong>Indicadores visuales:</strong> Status dot animado, badges, typing indicator</li>
+                    <li><strong>Bordes refinados:</strong> Radios suaves (6px a 16px) para modernidad</li>
+                    <li><strong>Animaciones sutiles:</strong> Sin ser intrusivas, mejoran UX</li>
+                    <li><strong>Accesibilidad:</strong> Contraste WCAA, focus states claros</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const colorSchemes = {
+            blue: {
+                primary: '#007cba',
+                secondary: '#00ba7c'
+            },
+            purple: {
+                primary: '#7c3aed',
+                secondary: '#d946ef'
+            },
+            emerald: {
+                primary: '#059669',
+                secondary: '#10b981'
+            },
+            orange: {
+                primary: '#f97316',
+                secondary: '#fb923c'
+            }
+        };
+
+        document.querySelectorAll('input[name="colorScheme"]').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const scheme = colorSchemes[e.target.value];
+                document.documentElement.style.setProperty('--primary-color', scheme.primary);
+                document.documentElement.style.setProperty('--secondary-color', scheme.secondary);
+                
+                // Save preference
+                localStorage.setItem('nexgen-color-scheme', e.target.value);
+            });
+        });
+
+        // Load saved preference
+        const saved = localStorage.getItem('nexgen-color-scheme') || 'blue';
+        document.getElementById(`color-${saved}`).checked = true;
+        const scheme = colorSchemes[saved];
+        document.documentElement.style.setProperty('--primary-color', scheme.primary);
+        document.documentElement.style.setProperty('--secondary-color', scheme.secondary);
+
+        // Demo interactivity
+        document.querySelector('.nexgen-chatbot-close').addEventListener('click', () => {
+            const window = document.querySelector('.nexgen-chatbot-window');
+            window.style.animation = 'slideDownOut 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards';
+            setTimeout(() => {
+                window.style.animation = 'slideUpIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+            }, 500);
+        });
+
+        // Input focus effect
+        document.querySelector('.nexgen-chatbot-input-area input').addEventListener('focus', function() {
+            this.style.borderColor = 'var(--primary-color)';
+        });
+
+        document.querySelector('.nexgen-chatbot-input-area input').addEventListener('blur', function() {
+            this.style.borderColor = 'var(--border-light)';
+        });
+    </script>
+</body>
+</html>
