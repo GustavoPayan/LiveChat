@@ -74,7 +74,7 @@ This plugin is designed for developers or site owners who want to:
 
 * [ ] Improve settings page
 * [ ] Support for multiple Telegram users
-* [ ] Chat history storage
+* [ ] Chat history storage  
 * [ ] Custom UI themes
 
 ---

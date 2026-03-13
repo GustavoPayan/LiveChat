@@ -51,11 +51,13 @@ class NexGen_Telegram_Chat {
 
 	/**
 	 * Plugin initialization
+	 * Note: No longer initializing sessions here to prevent REST API conflicts
 	 *
 	 * @return void
 	 */
 	public function init() {
-		NexGen_Session_Service::init();
+		// Placeholder for future initialization if needed
+		// Session management is now cookie-based and doesn't require init()
 	}
 
 	/**
