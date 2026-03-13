@@ -32,6 +32,9 @@ class NexGen_Telegram_Chat {
 		add_action( 'wp_ajax_nexgen_get_messages', [ $this, 'handle_get_messages' ] );
 		add_action( 'wp_ajax_nopriv_nexgen_get_messages', [ $this, 'handle_get_messages' ] );
 
+		add_action( 'wp_ajax_nexgen_get_conversation', [ $this, 'handle_get_conversation' ] );
+		add_action( 'wp_ajax_nopriv_nexgen_get_conversation', [ $this, 'handle_get_conversation' ] );
+
 		// AJAX - Session name
 		add_action( 'wp_ajax_nexgen_set_chat_name', [ $this, 'handle_set_chat_name' ] );
 		add_action( 'wp_ajax_nopriv_nexgen_set_chat_name', [ $this, 'handle_set_chat_name' ] );
@@ -320,6 +323,46 @@ class NexGen_Telegram_Chat {
 			wp_send_json_success( $messages );
 		} catch ( Exception $e ) {
 			NexGen_Security::log_event( 'get_messages_error', [ 'error' => $e->getMessage() ] );
+			wp_send_json_error( $e->getMessage() );
+		}
+	}
+
+	/**
+	 * AJAX: Get conversation history (Phase 5 - optimized)
+	 * Retrieves paginated conversation history for infinite scroll
+	 *
+	 * @return void
+	 */
+	public function handle_get_conversation() {
+		try {
+			if ( ! NexGen_Security::verify_nonce() ) {
+				wp_send_json_error( 'Nonce inválido' );
+			}
+
+			$session_id = NexGen_Session_Service::get_session_id();
+			if ( ! $session_id ) {
+				wp_send_json_error( 'No session' );
+			}
+
+			if ( ! NexGen_Security::validate_session_id( $session_id ) ) {
+				wp_send_json_error( 'Session ID inválido' );
+			}
+
+			// Get pagination params
+			$offset = isset( $_GET['offset'] ) ? max( 0, (int) $_GET['offset'] ) : 0;
+			$limit  = isset( $_GET['limit'] ) ? min( 20, (int) $_GET['limit'] ) : 10;  // Max 20 to prevent abuse
+
+			// Rate limit: max 1 request per second
+			$rate_check = NexGen_Security::check_rate_limit( $session_id . '_history', 1, 1 );
+			if ( ! $rate_check['allowed'] ) {
+				wp_send_json_error( 'Too many requests' );
+			}
+
+			$messages = NexGen_Message_Service::get_conversation_optimized( $session_id, $limit, $offset );
+
+			wp_send_json_success( $messages );
+		} catch ( Exception $e ) {
+			NexGen_Security::log_event( 'get_conversation_error', [ 'error' => $e->getMessage() ] );
 			wp_send_json_error( $e->getMessage() );
 		}
 	}

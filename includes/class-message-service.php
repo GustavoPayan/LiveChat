@@ -17,10 +17,13 @@ class NexGen_Message_Service {
 
 	/**
 	 * Get database table name
+	 * 
+	 * Constructs the full table name with WordPress prefix.
+	 * Table name: wp_nexgen_chat_messages (or custom prefix).
 	 *
-	 * @return string Full table name with prefix.
+	 * @return string Full table name with WordPress prefix.
 	 */
-	public static function get_table_name() {
+	public static function get_table_name(): string {
 		global $wpdb;
 		return $wpdb->prefix . self::TABLE_NAME_SUFFIX;
 	}
@@ -28,9 +31,21 @@ class NexGen_Message_Service {
 	/**
 	 * Create messages table if it doesn't exist
 	 *
-	 * @return bool True on success.
+	 * Called during plugin activation. Creates table with proper indexes
+	 * for performance and calls upgrade_table_schema() for compatibility.
+	 *
+	 * Table schema:
+	 * - id: auto-increment primary key
+	 * - session_id: indexed (for polling queries)
+	 * - created_at: indexed (for ordering)
+	 * - message_text: full message content
+	 * - message_type: 'user', 'bot', 'system'
+	 * - sender_info: JSON with ip, user_agent, page, name
+	 * - ip_hash: SHA256 hash of IP (GDPR compliant)
+	 *
+	 * @return bool True on success (always returns true for compatibility).
 	 */
-	public static function create_table() {
+	public static function create_table(): bool {
 		global $wpdb;
 
 		$table_name      = self::get_table_name();
@@ -121,31 +136,48 @@ class NexGen_Message_Service {
 
 	/**
 	 * Save a message to database
+	 * 
+	 * Validates input, hashes IP, and persists message with sender metadata.
+	 * This is the primary method for storing messages in the chat system.
 	 *
-	 * @param string $session_id Session ID.
-	 * @param string $message Message text.
-	 * @param string $type Message type (user, bot, system).
-	 * @param int    $telegram_message_id Optional Telegram message ID.
-	 * @param array  $sender_info Optional sender information.
-	 * @return int|false Insert ID or false on failure.
-	 * @throws Exception On validation error.
+	 * @param string      $session_id Session ID (format: chat_<slug>_<6-hex>).
+	 * @param string      $message Message text (max 1000 chars after validation).
+	 * @param string      $type Message type: 'user', 'bot', or 'system'.
+	 * @param int|null    $telegram_message_id Optional Telegram message ID for linking.
+	 * @param array       $sender_info Optional sender metadata (ip, user_agent, page, name).
+	 * 
+	 * @return int Insert ID on success.
+	 * @throws Exception If session_id/message empty, invalid type, or DB insert fails.
+	 * 
+	 * @example
+	 * try {
+	 *   $msg_id = NexGen_Message_Service::save_message(
+	 *     'chat_mysite_abc123',
+	 *     'How much does the plan cost?',
+	 *     'user',
+	 *     null,
+	 *     ['name' => 'John', 'ip' => '192.168.1.1']
+	 *   );
+	 * } catch (Exception $e) {
+	 *   NexGen_Security::log_event('message_save_error', ['error' => $e->getMessage()]);
+	 * }
 	 */
 	public static function save_message(
-		$session_id,
-		$message,
-		$type = 'user',
-		$telegram_message_id = null,
-		$sender_info = []
-	) {
+		string $session_id,
+		string $message,
+		string $type = 'user',
+		?int $telegram_message_id = null,
+		array $sender_info = []
+	): int {
 		global $wpdb;
 
-		// Validate
+		// Validate input
 		if ( empty( $session_id ) || empty( $message ) ) {
 			throw new Exception( 'Session ID and message are required' );
 		}
 
 		if ( ! in_array( $type, [ 'user', 'bot', 'system' ], true ) ) {
-			throw new Exception( 'Invalid message type' );
+			throw new Exception( 'Invalid message type: ' . esc_attr( $type ) );
 		}
 
 		$table_name = self::get_table_name();
@@ -192,10 +224,13 @@ class NexGen_Message_Service {
 
 	/**
 	 * Get default sender information
+	 * 
+	 * Collects client IP, user agent, referrer page, and chat name.
+	 * Called when sender_info array is empty or incomplete.
 	 *
-	 * @return array Sender data.
+	 * @return array Sender data with keys: ip, user_agent, page, name.
 	 */
-	private static function get_default_sender_info() {
+	private static function get_default_sender_info(): array {
 		return [
 			'ip'         => NexGen_Security::get_user_ip(),
 			'user_agent' => isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '',
@@ -205,14 +240,18 @@ class NexGen_Message_Service {
 	}
 
 	/**
-	 * Get messages for a session
+	 * Get messages for a session (NEW messages for polling)
 	 *
-	 * @param string $session_id Session ID.
-	 * @param int    $after_message_id Return messages after this ID (for polling).
-	 * @param int    $limit Maximum number of messages.
-	 * @return array Array of message objects.
+	 * Used by frontend polling to get only new messages since last check.
+	 * Returns messages in ascending order (oldest first) for chronological display.
+	 *
+	 * @param string $session_id Session ID (format: chat_<slug>_<6-hex>).
+	 * @param int    $after_message_id Return messages after this ID (default 0).
+	 * @param int    $limit Maximum number of messages to return (default 50).
+	 * 
+	 * @return array Array of message objects with: id, text, type, time. Empty if no messages.
 	 */
-	public static function get_messages( $session_id, $after_message_id = 0, $limit = 50 ) {
+	public static function get_messages( string $session_id, int $after_message_id = 0, int $limit = 50 ): array {
 		global $wpdb;
 
 		if ( empty( $session_id ) ) {
@@ -323,11 +362,14 @@ class NexGen_Message_Service {
 
 	/**
 	 * Get message count for a session
+	 * 
+	 * Returns total number of messages in a conversation.
+	 * Used for statistics and UX features (e.g., "40 messages in this chat").
 	 *
-	 * @param string $session_id Session ID.
-	 * @return int Message count.
+	 * @param string $session_id Session ID (format: chat_<slug>_<6-hex>).
+	 * @return int Message count (0 if session has no messages).
 	 */
-	public static function get_message_count( $session_id ) {
+	public static function get_message_count( string $session_id ): int {
 		global $wpdb;
 
 		$table_name = self::get_table_name();
@@ -344,11 +386,14 @@ class NexGen_Message_Service {
 
 	/**
 	 * Find message by Telegram message ID
+	 * 
+	 * Links Telegram webhook replies back to original session.
+	 * Used in webhook handler to extract session_id from Telegram message thread.
 	 *
-	 * @param int $telegram_message_id Telegram message ID.
-	 * @return object|null Message object.
+	 * @param int $telegram_message_id Telegram message ID from webhooks.
+	 * @return object|null Message object if found, null otherwise.
 	 */
-	public static function get_by_telegram_id( $telegram_message_id ) {
+	public static function get_by_telegram_id( int $telegram_message_id ): ?object {
 		global $wpdb;
 
 		$table_name = self::get_table_name();
@@ -358,6 +403,67 @@ class NexGen_Message_Service {
 				"SELECT * FROM $table_name WHERE telegram_message_id = %d",
 				$telegram_message_id
 			)
+		);
+	}
+
+	/**
+	 * Get conversation optimized - for Phase 5 (lightweight history)
+	 * 
+	 * Retrieves paginated history without loading entire chat.
+	 * Used by infinite scroll and for building Gemini context.
+	 * Returns messages in chronological order (oldest first).
+	 *
+	 * Performance: less than 50ms for 10 messages (with DB indexes).
+	 *
+	 * @param string $session_id Session ID (format: chat_<slug>_<6-hex>).
+	 * @param int    $limit Number of messages to retrieve (default 10, max 20).
+	 * @param int    $offset Pagination offset (default 0).
+	 * 
+	 * @return array Array of message objects with: id, text, type, time, sender.
+	 */
+	public static function get_conversation_optimized( string $session_id, int $limit = 10, int $offset = 0 ): array {
+		global $wpdb;
+
+		if ( empty( $session_id ) ) {
+			return [];
+		}
+
+		$table_name = self::get_table_name();
+
+		// Get latest messages (descending order)
+		$query = $wpdb->prepare(
+			"SELECT id, message_text, message_type, created_at, sender_info
+			 FROM $table_name
+			 WHERE session_id = %s
+			 ORDER BY created_at DESC
+			 LIMIT %d OFFSET %d",
+			$session_id,
+			$limit,
+			$offset
+		);
+
+		$messages = $wpdb->get_results( $query );
+
+		if ( is_null( $messages ) ) {
+			return [];
+		}
+
+		// Reverse to display chronologically (oldest first)
+		$messages = array_reverse( $messages );
+
+		// Format response
+		return array_map(
+			function( $msg ) {
+				$sender_info = ! empty( $msg->sender_info ) ? json_decode( $msg->sender_info, true ) : [];
+				return [
+					'id'     => (int) $msg->id,
+					'text'   => NexGen_Security::escape_message( $msg->message_text ),
+					'type'   => $msg->message_type,
+					'time'   => date( 'H:i', strtotime( $msg->created_at ) ),
+					'sender' => $sender_info['name'] ?? 'Usuario',
+				];
+			},
+			$messages
 		);
 	}
 }

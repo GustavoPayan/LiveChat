@@ -5,6 +5,13 @@ jQuery(document).ready(function($) {
     let lastMessageId = 0;
     let hasNewMessages = false;
 
+    // Phase 5: Conversation cache & pagination
+    let conversationCache = [];  // In-memory cache for history
+    let allMessagesLoaded = false;
+    let isLoadingMore = false;
+    let conversationOffset = 0;
+    const CONVERSATION_LIMIT = 10;  // Load 10 messages at a time
+
     const settings = nexgen_chat_ajax.settings;
     let sessionId = nexgen_chat_ajax.session_id; // mutable, se actualiza tras guardar nombre
 
@@ -65,41 +72,65 @@ jQuery(document).ready(function($) {
         }
     });
 
+    // Phase 5: Infinite scroll - Load more history when scrolling to top
+    $messages.on('scroll', function() {
+        if ($(this).scrollTop() === 0 && !isLoadingMore && !allMessagesLoaded) {
+            conversationOffset = conversationCache.length;
+            loadConversation(conversationOffset, CONVERSATION_LIMIT);
+        }
+    });
+
     // Funciones principales
     function openChat() {
         chatOpen = true;
-        $window.show();
-        $chatIcon.hide();
-        $closeIcon.show();
-        $input.focus();
-
-        // Ocultar notificación
-        $notification.hide();
-        hasNewMessages = false;
-
+        $window.removeClass('nexgen-exit').addClass('nexgen-enter');
+        $window.css('display', 'flex'); // Ensure flex display
+        
+        // Animate icon transition
+        $chatIcon.fadeOut(200);
+        $closeIcon.fadeIn(200);
+        
         // Cancelar auto-apertura si está activa
         if (autoOpenTimer) {
             clearTimeout(autoOpenTimer);
             autoOpenTimer = null;
         }
 
+        // Ocultar notificación con transición suave
+        $notification.fadeOut(200);
+        hasNewMessages = false;
+
+        // Focus input after animation
+        setTimeout(() => {
+            $input.focus();
+        }, 150);
+
         // Si no hay nombre guardado, mostrar overlay
         if (!getStoredName()) {
-            showNameOverlay();
+            setTimeout(() => showNameOverlay(), 200);
         }
 
         // Scroll al final
         scrollToBottom();
 
-        // Cargar mensajes existentes
-        loadExistingMessages();
+        // Phase 5: Load conversation optimized history (if cache is empty)
+        if (conversationCache.length === 0) {
+            loadConversation(0, CONVERSATION_LIMIT);
+        }
     }
 
     function closeChat() {
         chatOpen = false;
-        $window.hide();
-        $chatIcon.show();
-        $closeIcon.hide();
+        $window.removeClass('nexgen-enter').addClass('nexgen-exit');
+        
+        // Animate icon transition
+        $closeIcon.fadeOut(200);
+        $chatIcon.fadeIn(200);
+        
+        // Hide window after animation completes
+        setTimeout(() => {
+            $window.css('display', 'none');
+        }, 250);
     }
 
     function sendMessage() {
@@ -237,10 +268,62 @@ jQuery(document).ready(function($) {
         });
     }
 
+    /**
+     * Phase 5: Load conversation history optimized
+     * Fetches paginated history without overloading DB
+     */
+    function loadConversation(offset, limit) {
+        isLoadingMore = true;
+
+        $.ajax({
+            url: nexgen_chat_ajax.ajax_url,
+            type: 'GET',
+            data: {
+                action: 'nexgen_get_conversation',
+                offset: offset,
+                limit: limit,
+                nonce: nexgen_chat_ajax.nonce
+            },
+            timeout: 10000,
+            success: function(response) {
+                if (response.success && response.data.length > 0) {
+                    // Add to cache
+                    conversationCache = response.data.concat(conversationCache);
+
+                    // Render messages
+                    response.data.forEach(function(msg) {
+                        renderMessage(msg, false); // false = don't animate for history
+                    });
+
+                    // Update lastMessageId from newest message
+                    if (!lastMessageId && response.data.length > 0) {
+                        lastMessageId = response.data[response.data.length - 1].id;
+                    }
+                } else {
+                    allMessagesLoaded = true; // No more messages to load
+                }
+            },
+            error: function(xhr, status, error) {
+                if (nexgen_chat_ajax.debug) {
+                    console.log('NexGen Chat - Error loading conversation:', error);
+                }
+            },
+            complete: function() {
+                isLoadingMore = false;
+            }
+        });
+    }
+
     function showNotification() {
         hasNewMessages = true;
-        $notification.text('1').show();
+        $notification.text('1');
+        $notification.addClass('nexgen-notification-entering');
+        $notification.show();
         $toggle.addClass('has-notification');
+        
+        setTimeout(() => {
+            $notification.removeClass('nexgen-notification-entering');
+        }, 10);
     }
 
     function addMessage(text, type, time, animate = true) {
@@ -251,7 +334,7 @@ jQuery(document).ready(function($) {
         const messageClass = type === 'user' ? 'nexgen-user-message' : 'nexgen-bot-message';
 
         const messageHtml = `
-            <div class="nexgen-message ${messageClass}" ${animate ? 'style="opacity: 0;"' : ''}>
+            <div class="nexgen-message ${messageClass}${animate ? ' nexgen-message-entering' : ''}">
                 <div class="nexgen-message-content">${escapeHtml(text)}</div>
                 <div class="nexgen-message-time">${time}</div>
             </div>
@@ -260,30 +343,81 @@ jQuery(document).ready(function($) {
         const $newMessage = $(messageHtml);
         $messages.append($newMessage);
 
-        if (animate) $newMessage.animate({opacity: 1}, 300);
+        if (animate) {
+            // Trigger animation with slight delay for smooth rendering
+            setTimeout(() => {
+                $newMessage.removeClass('nexgen-message-entering');
+            }, 10);
+        }
 
         scrollToBottom();
+    }
+
+    /**
+     * Phase 5: Render message from history
+     * Used for both new messages and historical messages
+     */
+    function renderMessage(msg, animate = true) {
+        const messageClass = msg.type === 'user' ? 'nexgen-user-message' : 'nexgen-bot-message';
+
+        const messageHtml = `
+            <div class="nexgen-message ${messageClass}${animate ? ' nexgen-message-entering' : ''}">
+                <div class="nexgen-message-content">${escapeHtml(msg.text)}</div>
+                <div class="nexgen-message-time">${msg.time}</div>
+            </div>
+        `;
+
+        const $newMessage = $(messageHtml);
+        
+        // Insert at end for new messages, or at beginning for history
+        if (animate) {
+            $messages.append($newMessage);
+            setTimeout(() => {
+                $newMessage.removeClass('nexgen-message-entering');
+            }, 10);
+            scrollToBottom();
+        } else {
+            // For history, prepend and don't scroll
+            if ($messages.find('.nexgen-message').length === 0) {
+                $messages.append($newMessage);
+            } else {
+                $newMessage.prependTo($messages);
+            }
+        }
     }
 
     function addSystemMessage(text) {
         const time = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
         const messageHtml = `
-            <div class="nexgen-message nexgen-system-message">
+            <div class="nexgen-message nexgen-system-message nexgen-message-entering">
                 <div class="nexgen-message-content">${escapeHtml(text)}</div>
                 <div class="nexgen-message-time">${time}</div>
             </div>
         `;
-        $messages.append(messageHtml);
+        const $msg = $(messageHtml);
+        $messages.append($msg);
+        
+        // Trigger animation
+        setTimeout(() => {
+            $msg.removeClass('nexgen-message-entering');
+        }, 10);
+        
         scrollToBottom();
     }
 
     function showTyping() {
-        $typing.show();
+        $typing.addClass('nexgen-typing-entering');
+        setTimeout(() => {
+            $typing.removeClass('nexgen-typing-entering').show();
+        }, 10);
         scrollToBottom();
     }
 
     function hideTyping() {
-        $typing.hide();
+        $typing.addClass('nexgen-typing-exiting');
+        setTimeout(() => {
+            $typing.removeClass('nexgen-typing-exiting').hide();
+        }, 200);
     }
 
     function scrollToBottom() {
@@ -303,15 +437,22 @@ jQuery(document).ready(function($) {
     }
 
     function showNameOverlay() {
+        $nameOverlay.removeClass('nexgen-overlay-exiting').addClass('nexgen-overlay-entering');
         $nameOverlay.show();
         $nameInput.removeClass('nexgen-input-error');
         const stored = getStoredName();
         if (stored) $nameInput.val(stored);
-        setTimeout(() => $nameInput.trigger('focus'), 50);
+        setTimeout(() => {
+            $nameInput.trigger('focus');
+            $nameOverlay.removeClass('nexgen-overlay-entering');
+        }, 50);
     }
 
     function hideNameOverlay() {
-        $nameOverlay.hide();
+        $nameOverlay.addClass('nexgen-overlay-exiting');
+        setTimeout(() => {
+            $nameOverlay.removeClass('nexgen-overlay-exiting').hide();
+        }, 200);
     }
 
     function saveName() {

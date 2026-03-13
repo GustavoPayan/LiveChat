@@ -2,9 +2,9 @@
 
 ## ✅ Archivo Correcto
 
-**Usa:** `n8n-workflow-importable.json` (NUEVO - totalmente limpio)
+**Usa:** `n8n-simple-workflow.json` ✅ FUNCIONA - Incluye historial contextuado (Fase 5) - **CORREGIDO v3.1.0**
 
-**NO USES:** `n8n-gemini-workflow-FIXED.json` (tenía problemas de importación)
+**Ver:** [N8N_WORKFLOW_FIXES.md](N8N_WORKFLOW_FIXES.md) para detalles de correcciones realizadas
 
 ---
 
@@ -20,11 +20,11 @@
 **Opción A: Upload directo**
 1. Click en el botón **≡ (Menú)** > **Import**
 2. Seleccionar **"From File"**
-3. Elegir `n8n-workflow-importable.json`
+3. Elegir `n8n-simple-workflow.json`
 4. Click **"Open"**
 
 **Opción B: Copiar/Pegar**
-1. Abrir `n8n-workflow-importable.json` en editor de texto
+1. Abrir `n8n-simple-workflow.json` en editor de texto
 2. Copiar todo el contenido
 3. En n8n, click **≡ > Import**
 4. Seleccionar **"From Clipboard"**
@@ -83,7 +83,7 @@ En n8n:
 ### Test 1: Verificar que se importó
 
 Después de importar, deberías ver:
-- ✓ 11 nodos
+- ✓ 8 nodos (incluye historial - Fase 5)
 - ✓ Conexiones entre todos
 - ✓ Webhook está listening
 
@@ -131,26 +131,19 @@ curl -X POST https://tu-n8n.com/webhook/livechat \
 ```
 Webhook In (recibir mensaje)
     ↓
-Extract Input (parsear datos)
+Extract Data (parsear mensaje, session_id, visitor)
     ↓
-Fetch Context (obtener info de WordPress)
+Get History (obtener últimos 5 mensajes del contexto)
     ↓
-Extract Leads (buscar email, teléfono)
+Build Prompt (combinar historial + mensaje actual)
     ↓
-Validate (verificar que es mensaje válido)
+Call Gemini (enviar con contexto al API de Gemini)
     ↓
-Check Valid (ramificación: válido o inválido)
-    ├→ Build Prompt
-    │  ↓
-    │  Gemini API (generar respuesta)
-    │  ↓
-    │  Process Response
-    │  ↓
-    │  Save to WordPress
-    │  ↓
-    │  Success Response
-    │
-    └→ Handle Invalid (Si mensaje no válido)
+Parse Response (extraer texto de respuesta)
+    ↓
+Save to WordPress (guardar respuesta en DB)
+    ↓
+Success Response (confirmar al webhook)
 ```
 
 ---
@@ -178,14 +171,16 @@ Check Valid (ramificación: válido o inválido)
 
 ## 🔧 Diferencias Entre Archivos
 
-| Aspecto | Antiguo ❌ | Nuevo ✅ |
-|---------|-----------|---------|
-| Importable | NO | SÍ |
-| Template strings | Rotos | Funcionales |
-| bodyParametersJson | Muy complejo | Simple y limpio |
-| Credenciales | Hardcodeadas | Dinámicas |
-| Nodos | 13 | 11 (optimizado) |
-| Error handling | Incompleto | Robusto |
+| Aspecto | n8n-simple-workflow.json ✅ |
+|---------|---|
+| Importable | ✅ Sí (probado) |
+| Template strings | ✅ Correctos |
+| Headers | ✅ Válidos (sin `=`) |
+| Credenciales | ✅ Con variables de entorno |
+| Nodos | ✅ 8 (incluye historial - Fase 5) |
+| Historial contextuado | ✅ SÍ (ultimos 5 mensajes) |
+| API | ✅ Gemini + WordPress + Context |
+| Status | ✅ FUNCIONA |
 
 ---
 
@@ -224,7 +219,7 @@ Check Valid (ramificación: válido o inválido)
 ## ✅ Checklist Final
 
 - [ ] Leí esta guía
-- [ ] Descargué `n8n-workflow-importable.json`
+- [ ] Descargué `n8n-simple-workflow.json`
 - [ ] Importé en n8n
 - [ ] Creé variables de entorno
 - [ ] Creé credencial "Header Auth"

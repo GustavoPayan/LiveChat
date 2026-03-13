@@ -1,5 +1,5 @@
 {
-  "name": "NexGen Gemini Chat",
+  "name": "NexGen Gemini Chat - Phase 5",
   "nodes": [
     {
       "parameters": {
@@ -35,6 +35,32 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "={{ $env.WORDPRESS_URL }}/wp-json/nexgen/v1/get_conversation?offset=0&limit=5",
+        "sendHeaders": true,
+        "headers": {
+          "Authorization": "Bearer {{ $env.WORDPRESS_API_KEY }}"
+        }
+      },
+      "id": "3",
+      "name": "Get History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [650, 250],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get history from previous node (Get History)\nlet history = '';\n\n// Node 3 returns array of messages\nif ($input.all().length > 0) {\n  const historyData = $input.all()[0].json;\n  if (Array.isArray(historyData)) {\n    history = historyData.map(msg => \n      `${msg.sender || 'Usuario'}: ${msg.text}`\n    ).join('\\n');\n  }\n}\n\nlet contextText = history ? `Historial previo:\\n${history}\\n\\nNueva pregunta: ` : 'Nueva pregunta: ';\n\nreturn { \n  history: contextText,\n  message: $json.message,\n  session_id: $json.session_id\n};"
+      },
+      "id": "4",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 250]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
         "sendHeaders": true,
@@ -42,23 +68,23 @@
           "x-goog-api-key": "{{ $env.GEMINI_API_KEY }}"
         },
         "sendBody": true,
-        "bodyParametersJson": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.message }] }], generationConfig: { maxOutputTokens: 500 } }) }}"
+        "bodyParametersJson": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.history + $json.message }] }], generationConfig: { maxOutputTokens: 500 } }) }}"
       },
-      "id": "3",
+      "id": "5",
       "name": "Call Gemini",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [650, 250]
+      "position": [1050, 250]
     },
     {
       "parameters": {
-        "jsCode": "let response = 'Error';\nif ($json.body?.candidates?.[0]?.content?.parts?.[0]?.text) {\n  response = $json.body.candidates[0].content.parts[0].text;\n}\nreturn { response: response };"
+        "jsCode": "let response = 'Error processing request';\nif ($json.body?.candidates?.[0]?.content?.parts?.[0]?.text) {\n  response = $json.body.candidates[0].content.parts[0].text;\n}\n\n// Get session_id from previous data in the flow\nlet session_id = '';\nlet message = '';\n\n// Access all previous inputs to find session_id\nif ($input && $input.all && typeof $input.all === 'function') {\n  const allItems = $input.all();\n  if (allItems && allItems.length > 0) {\n    // Find first item with session_id\n    for (let item of allItems) {\n      if (item.json && item.json.session_id) {\n        session_id = item.json.session_id;\n        message = item.json.message || '';\n        break;\n      }\n    }\n  }\n}\n\nreturn { \n  response: response,\n  session_id: session_id,\n  message: message\n};"
       },
-      "id": "4",
+      "id": "6",
       "name": "Parse Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [850, 250]
+      "position": [1250, 250]
     },
     {
       "parameters": {
@@ -71,19 +97,19 @@
         "sendBody": true,
         "bodyParametersJson": "={{ JSON.stringify({ session_id: $json.session_id, message_text: $json.response, message_type: 'bot' }) }}"
       },
-      "id": "5",
+      "id": "7",
       "name": "Save to WP",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1050, 250]
+      "position": [1450, 250]
     },
     {
       "parameters": {},
-      "id": "6",
+      "id": "8",
       "name": "Response",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1250, 250]
+      "position": [1650, 250]
     }
   ],
   "connections": {
@@ -91,7 +117,9 @@
     "2": { "main": [[{ "node": "3", "type": "main", "index": 0 }]] },
     "3": { "main": [[{ "node": "4", "type": "main", "index": 0 }]] },
     "4": { "main": [[{ "node": "5", "type": "main", "index": 0 }]] },
-    "5": { "main": [[{ "node": "6", "type": "main", "index": 0 }]] }
-  },
+    "5": { "main": [[{ "node": "6", "type": "main", "index": 0 }]] },
+    "6": { "main": [[{ "node": "7", "type": "main", "index": 0 }]] },
+    "7": { "main": [[{ "node": "8", "type": "main", "index": 0 }]] }
+  ],
   "settings": {}
 }
