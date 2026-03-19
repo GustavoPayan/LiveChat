@@ -34,6 +34,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<button class="nexgen-tab-button active" onclick="switchTab(event, 'tab-telegram')">🤖 Telegram</button>
 		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-chat')">💬 Chat UI</button>
 		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-appearance')">🎨 Apariencia</button>
+		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-llm')">⚡ IA/LLM</button>
 		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-n8n')">🧠 N8N</button>
 		<button class="nexgen-tab-button" onclick="switchTab(event, 'tab-webhook')">🔗 Webhook</button>
 	</div>
@@ -135,7 +136,125 @@ if ( ! defined( 'ABSPATH' ) ) {
 		</table>
 		</div>
 
-		<!-- TAB 4: N8N Automation -->
+		<!-- TAB 4: LLM/IA Hybrid Routing -->
+		<div id="tab-llm" class="nexgen-tab-content">
+			<h2>⚡ Configuración de IA/LLM (Hybrid Routing)</h2>
+			<p style="background: #e8f5ff; padding: 15px; border-left: 4px solid #0078d4; border-radius: 4px; margin-bottom: 20px;">
+				<strong>🚀 Sistema Híbrido:</strong> 80% LLM directo (rápido), 15% N8N (leads), 5% Soporte humano
+			</p>
+
+			<table class="form-table">
+				<tr>
+					<th scope="row"><label for="nexgen_llm_enabled">Habilitar Routing LLM Híbrido</label></th>
+					<td>
+						<input type="checkbox" name="nexgen_llm_enabled" id="nexgen_llm_enabled" value="1" <?php checked( get_option( 'nexgen_llm_enabled', 1 ) ); ?> />
+						<p class="description">✅ Activa el nuevo sistema inteligente de enrutamiento</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_llm_provider">Proveedor de IA</label></th>
+					<td>
+						<select name="nexgen_llm_provider" id="nexgen_llm_provider">
+							<option value="openai" <?php selected( get_option( 'nexgen_llm_provider', 'openai' ), 'openai' ); ?>>OpenAI (GPT-4o-mini) - Recomendado</option>
+							<option value="claude" <?php selected( get_option( 'nexgen_llm_provider', 'openai' ), 'claude' ); ?>>Claude 3.5 Haiku - Análisis avanzado</option>
+							<option value="gemini" <?php selected( get_option( 'nexgen_llm_provider', 'openai' ), 'gemini' ); ?>>Google Gemini 2.0 - Más rápido</option>
+						</select>
+						<p class="description">Elige el proveedor de IA. OpenAI es recomendado.</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_llm_api_key">Clave API del Proveedor IA</label></th>
+					<td>
+						<input type="password" name="nexgen_llm_api_key" id="nexgen_llm_api_key" value="<?php echo esc_attr( get_option( 'nexgen_llm_api_key' ) ); ?>" class="regular-text" placeholder="sk-... (OpenAI) o api-key (Claude/Gemini)" />
+						<p class="description">🔐 Clave API segura. O define NEXGEN_LLM_API_KEY en wp-config.php</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_business_context">Contexto de Tu Negocio</label></th>
+					<td>
+						<textarea name="nexgen_business_context" id="nexgen_business_context" rows="6" class="large-text" placeholder="Describe tu negocio, productos, servicios..."><?php echo esc_textarea( get_option( 'nexgen_business_context' ) ); ?></textarea>
+						<p class="description">📝 Se incluye en cada prompt de IA</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_business_type">Tipo de Negocio</label></th>
+					<td>
+						<select name="nexgen_business_type" id="nexgen_business_type">
+							<option value="general" <?php selected( get_option( 'nexgen_business_type', 'general' ), 'general' ); ?>>General</option>
+							<option value="saas" <?php selected( get_option( 'nexgen_business_type', 'general' ), 'saas' ); ?>>SaaS / Software</option>
+							<option value="ecommerce" <?php selected( get_option( 'nexgen_business_type', 'general' ), 'ecommerce' ); ?>>E-commerce</option>
+							<option value="service" <?php selected( get_option( 'nexgen_business_type', 'general' ), 'service' ); ?>>Servicios</option>
+						</select>
+						<p class="description">Optimiza respuestas de IA según tu tipo de negocio</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_supported_topics">Temas Soportados</label></th>
+					<td>
+						<textarea name="nexgen_supported_topics" id="nexgen_supported_topics" rows="5" class="large-text" placeholder="Información de productos&#10;Precios&#10;Características&#10;Soporte técnico&#10;Cuenta"><?php echo esc_textarea( implode( "\n", (array) get_option( 'nexgen_supported_topics', ['Información del producto', 'Precios', 'Características'] ) ) ); ?></textarea>
+						<p class="description">📋 Uno por línea. Temas que tu IA puede responder.</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_scope_keywords">Palabras Clave de Validación</label></th>
+					<td>
+						<textarea name="nexgen_scope_keywords" id="nexgen_scope_keywords" rows="4" class="large-text" placeholder="precio&#10;características&#10;soporte&#10;producto"><?php echo esc_textarea( get_option( 'nexgen_scope_keywords' ) ); ?></textarea>
+						<p class="description">🔍 Palabras clave para detectar si el mensaje es relevante</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_lead_keywords">Palabras Clave para Leads</label></th>
+					<td>
+						<textarea name="nexgen_lead_keywords" id="nexgen_lead_keywords" rows="4" class="large-text" placeholder="contacto&#10;reunión&#10;agendar&#10;demo"><?php echo esc_textarea( get_option( 'nexgen_lead_keywords' ) ); ?></textarea>
+						<p class="description">🎯 Detecta cuando el usuario quiere contactar</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_rejection_message">Mensaje de Rechazo (Out-of-Scope)</label></th>
+					<td>
+						<textarea name="nexgen_rejection_message" id="nexgen_rejection_message" rows="3" class="large-text" placeholder="Aprecio tu pregunta, pero ese tema está fuera..."><?php echo esc_textarea( get_option( 'nexgen_rejection_message' ) ); ?></textarea>
+						<p class="description">💬 Respuesta cuando la pregunta está fuera de alcance</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_llm_temperature">Temperatura (Creatividad)</label></th>
+					<td>
+						<input type="range" name="nexgen_llm_temperature" id="nexgen_llm_temperature" min="0" max="1" step="0.1" value="<?php echo esc_attr( get_option( 'nexgen_llm_temperature', 0.7 ) ); ?>" style="width: 200px;" />
+						<span id="temp-display" style="margin-left: 10px; font-weight: bold;"><?php echo esc_attr( get_option( 'nexgen_llm_temperature', 0.7 ) ); ?></span>
+						<p class="description">🎯 0=preciso, 1=creativo. Recomendado: 0.7</p>
+					</td>
+				</tr>
+
+				<tr>
+					<th scope="row"><label for="nexgen_llm_max_tokens">Tokens Máximos</label></th>
+					<td>
+						<input type="number" name="nexgen_llm_max_tokens" id="nexgen_llm_max_tokens" value="<?php echo esc_attr( get_option( 'nexgen_llm_max_tokens', 500 ) ); ?>" min="50" max="2000" />
+						<p class="description">📏 Límite de palabras por respuesta (default 500)</p>
+					</td>
+				</tr>
+			</table>
+
+			<div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+				<h4>🧪 Prueba de Conexión LLM</h4>
+				<button type="button" class="button button-primary" onclick="testLLMConnection()">🧪 Probar Conexión LLM</button>
+				<p class="description" style="margin-top: 10px;">Envía un mensaje de prueba a tu proveedor IA.</p>
+			</div>
+
+			<div class="notice notice-info" style="margin: 20px 0;">
+				<p><strong>💡 Sistema Híbrido:</strong> 80% LLM (rápido), 15% N8N, 5% Humano | <strong>90% más barato</strong> vs N8N-only</p>
+			</div>
+		</div>
+
+		<!-- TAB 5: N8N Automation -->
 		<div id="tab-n8n" class="nexgen-tab-content">
 			<h2>🤖 Automatización N8N</h2>
 		<table class="form-table">
@@ -406,4 +525,40 @@ function testN8NConnection() {
 		button.disabled = false;
 	});
 }
+
+function testLLMConnection() {
+	const button = event.target;
+	const originalText = button.textContent;
+	button.textContent = 'Probando...';
+	button.disabled = true;
+
+	fetch(ajaxurl, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+		body: 'action=nexgen_test_llm'
+	})
+	.then(r => r.json())
+	.then(data => {
+		if (data.success) {
+			alert('✅ Conexión LLM exitosa!\n\n📝 Respuesta:\n' + data.data.response + '\n\n⏱️ Latencia: ' + data.data.latency_ms + 'ms\n💰 Costo: $' + data.data.cost.toFixed(4));
+		} else {
+			alert('❌ Error: ' + data.data);
+		}
+	})
+	.catch(err => alert('❌ Error de conexión: ' + err))
+	.finally(() => {
+		button.textContent = originalText;
+		button.disabled = false;
+	});
+}
+
+// Update temperature display when slider changes
+document.addEventListener('DOMContentLoaded', function() {
+	const tempSlider = document.getElementById('nexgen_llm_temperature');
+	if (tempSlider) {
+		tempSlider.addEventListener('input', function() {
+			document.getElementById('temp-display').textContent = this.value;
+		});
+	}
+});
 </script>

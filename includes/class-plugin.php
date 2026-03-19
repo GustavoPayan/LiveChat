@@ -47,6 +47,7 @@ class NexGen_Telegram_Chat {
 		add_action( 'wp_ajax_nexgen_debug_test', [ $this, 'handle_debug_test' ] );
 		add_action( 'wp_ajax_nexgen_set_webhook', [ $this, 'handle_set_webhook' ] );
 		add_action( 'wp_ajax_nexgen_test_n8n', [ $this, 'handle_test_n8n' ] );
+		add_action( 'wp_ajax_nexgen_test_llm', [ $this, 'handle_test_llm' ] );
 
 		// Activation hook
 		register_activation_hook( NEXGEN_CHAT_MAIN_FILE, [ $this, 'on_activate' ] );
@@ -208,6 +209,7 @@ class NexGen_Telegram_Chat {
 
 	/**
 	 * AJAX: Handle send message
+	 * Hybrid routing: LLM (80%) → Leads/N8N (15%) → Blocked/Telegram (5%)
 	 *
 	 * @return void
 	 */
@@ -218,7 +220,7 @@ class NexGen_Telegram_Chat {
 				wp_send_json_error( 'Nonce inválido' );
 			}
 
-			// Get message
+			// Get and validate message
 			$message = isset( $_POST['message'] ) ? $_POST['message'] : '';
 			$message_validation = NexGen_Security::validate_message( $message );
 
@@ -229,6 +231,7 @@ class NexGen_Telegram_Chat {
 			$message    = $message_validation['message'];
 			$session_id = isset( $_POST['session_id'] ) ? sanitize_text_field( $_POST['session_id'] ) : '';
 
+			// Validate session ID
 			if ( ! NexGen_Security::validate_session_id( $session_id ) ) {
 				wp_send_json_error( 'Session ID inválido' );
 			}
@@ -239,61 +242,28 @@ class NexGen_Telegram_Chat {
 				wp_send_json_error( 'Demasiados mensajes. Intenta más tarde.' );
 			}
 
-			// Save message
-			NexGen_Message_Service::save_message( $session_id, $message, 'user' );
+			// Get visitor name from session
+			$visitor_name = isset( $_SESSION['nexgen_chat_name'] ) ? $_SESSION['nexgen_chat_name'] : '';
 
-			// Route to Telegram or N8N
-			$config = NexGen_Telegram_Service::get_config();
-			if ( ! $config['active'] ) {
-				wp_send_json_error( 'Bot no configurado' );
+			// Route message through hybrid LLM + N8N router
+			$result = NexGen_LLM_Router::process_message(
+				message: $message,
+				session_id: $session_id,
+				visitor_name: $visitor_name,
+				visitor_email: ''
+			);
+
+			if ( ! $result['success'] ) {
+				wp_send_json_error( $result['response'] );
 			}
 
-			// Check if should go to N8N
-			if ( NexGen_N8N_Service::should_process( $message ) ) {
-				// Try to route to N8N for automated response
-				$n8n_result = NexGen_N8N_Service::send_to_n8n( $message, $session_id );
-
-				if ( $n8n_result['success'] && ! empty( $n8n_result['response'] ) ) {
-					// N8N provided automated response
-					NexGen_Message_Service::save_message( $session_id, $n8n_result['response'], 'bot' );
-					NexGen_Security::log_event( 'n8n_response_sent', [ 'session_id' => $session_id ] );
-
-					wp_send_json_success( [
-						'message'    => 'Mensaje procesado automáticamente',
-						'session_id' => $session_id,
-						'automated'  => true,
-					] );
-				} else {
-					// N8N failed or no response, fallback to Telegram human
-					NexGen_Security::log_event( 'n8n_fallback', [ 
-						'session_id' => $session_id,
-						'error'      => $n8n_result['error'],
-					] );
-
-					$response = NexGen_Telegram_Service::send_message( $message, $session_id );
-					if ( ! $response['success'] ) {
-						wp_send_json_error( $response['error'] );
-					}
-
-					wp_send_json_success( [
-						'message'    => 'Mensaje enviado a soporte humano',
-						'session_id' => $session_id,
-						'automated'  => false,
-					] );
-				}
-			} else {
-				// Route directly to Telegram human support
-				$response = NexGen_Telegram_Service::send_message( $message, $session_id );
-				if ( ! $response['success'] ) {
-					wp_send_json_error( $response['error'] );
-				}
-
-				wp_send_json_success( [
-					'message'    => 'Mensaje enviado a soporte humano',
-					'session_id' => $session_id,
-					'automated'  => false,
-				] );
-			}
+			// Success response with route type and metadata
+			wp_send_json_success( [
+				'message'    => $result['response'],
+				'session_id' => $session_id,
+				'type'       => $result['type'],
+				'metadata'   => $result['metadata'] ?? [],
+			] );
 		} catch ( Exception $e ) {
 			NexGen_Security::log_event( 'send_message_error', [ 'error' => $e->getMessage() ] );
 			wp_send_json_error( 'Error interno: ' . $e->getMessage() );
@@ -503,6 +473,53 @@ class NexGen_Telegram_Chat {
 	}
 
 	/**
+	 * Test LLM connection (AJAX handler)
+	 *
+	 * @return void
+	 */
+	public function handle_test_llm() {
+		try {
+			if ( ! current_user_can( 'manage_options' ) ) {
+				wp_send_json_error( 'Sin permisos' );
+			}
+
+			// Check if LLM is enabled
+			$llm_enabled = get_option( 'nexgen_llm_enabled', true );
+			if ( ! $llm_enabled ) {
+				wp_send_json_error( 'LLM no está habilitado' );
+			}
+
+			// Check API key
+			$api_key = get_option( 'nexgen_llm_api_key' );
+			if ( empty( $api_key ) ) {
+				wp_send_json_error( 'Clave API no configurada' );
+			}
+
+			// Test LLM query
+			$start_time = microtime( true );
+			$result = NexGen_LLM_Service::query(
+				'¿Cuál es 2+2? Responde brevemente.',
+				'Eres un asistente útil. Responde en español de forma breve.'
+			);
+			$latency_ms = round( ( microtime( true ) - $start_time ) * 1000, 2 );
+
+			if ( ! $result['success'] ) {
+				wp_send_json_error( 'Error LLM: ' . $result['error'] );
+			}
+
+			wp_send_json_success( [
+				'response'   => $result['response'],
+				'latency_ms' => $latency_ms,
+				'cost'       => $result['cost'] ?? 0,
+				'provider'   => $result['provider'] ?? 'unknown',
+			] );
+		} catch ( Exception $e ) {
+			NexGen_Security::log_event( 'test_llm_error', [ 'error' => $e->getMessage() ] );
+			wp_send_json_error( 'Error: ' . $e->getMessage() );
+		}
+	}
+
+	/**
 	 * Register admin menu
 	 *
 	 * @return void
@@ -577,6 +594,53 @@ class NexGen_Telegram_Chat {
 		] );
 		register_setting( 'nexgen_chat_settings', 'nexgen_ai_keywords', [
 			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
+
+		// LLM/IA settings (Phase 5 - Hybrid Routing)
+		register_setting( 'nexgen_chat_settings', 'nexgen_llm_enabled', [
+			'sanitize_callback' => function( $value ) {
+				return ! empty( $value ) ? 1 : 0;
+			},
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_llm_provider', [
+			'sanitize_callback' => function( $value ) {
+				return in_array( $value, ['openai', 'claude', 'gemini'], true ) ? $value : 'openai';
+			},
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_llm_api_key', [
+			'sanitize_callback' => 'sanitize_text_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_business_context', [
+			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_business_type', [
+			'sanitize_callback' => function( $value ) {
+				return in_array( $value, ['general', 'saas', 'ecommerce', 'service', 'agency'], true ) ? $value : 'general';
+			},
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_supported_topics', [
+			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_scope_keywords', [
+			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_lead_keywords', [
+			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_rejection_message', [
+			'sanitize_callback' => 'sanitize_textarea_field',
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_llm_temperature', [
+			'sanitize_callback' => function( $value ) {
+				$temp = floatval( $value );
+				return $temp >= 0 && $temp <= 1 ? $temp : 0.7;
+			},
+		] );
+		register_setting( 'nexgen_chat_settings', 'nexgen_llm_max_tokens', [
+			'sanitize_callback' => function( $value ) {
+				$tokens = absint( $value );
+				return $tokens >= 50 && $tokens <= 2000 ? $tokens : 500;
+			},
 		] );
 	}
 

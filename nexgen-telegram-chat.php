@@ -25,6 +25,13 @@ require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-message-service.php';
 require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-telegram-service.php';
 require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-n8n-service.php';
 require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-n8n-endpoints.php';
+
+// Load hybrid LLM + N8N services
+require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-llm-service.php';
+require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-business-prompt-service.php';
+require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-llm-router.php';
+
+// Load main plugin class
 require_once NEXGEN_CHAT_PLUGIN_PATH . 'includes/class-plugin.php';
 
 // Initialize plugin
