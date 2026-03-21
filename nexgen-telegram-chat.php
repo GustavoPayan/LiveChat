@@ -2,7 +2,7 @@
 /**
  * Plugin Name: NexGen Telegram Chat
  * Description: Plugin de chat bidireccional integrado con Telegram Bot para WordPress
- * Version: 3.0.2
+ * Version: 3.2.1
  * Author: Gustavo Payan
  * 
  * @package NexGenTelegramChat

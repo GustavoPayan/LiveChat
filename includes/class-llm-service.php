@@ -43,7 +43,7 @@ class NexGen_LLM_Service {
 		}
 
 		// Fallback to encrypted option
-		$encrypted = get_option( '_nexgen_llm_api_key_encrypted' );
+		$encrypted = get_option( 'nexgen_llm_api_key' );
 		if ( $encrypted ) {
 			return $encrypted;
 		}

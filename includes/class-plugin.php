@@ -49,6 +49,10 @@ class NexGen_Telegram_Chat {
 		add_action( 'wp_ajax_nexgen_test_n8n', [ $this, 'handle_test_n8n' ] );
 		add_action( 'wp_ajax_nexgen_test_llm', [ $this, 'handle_test_llm' ] );
 
+		// AJAX - Security (nonce refresh)
+		add_action( 'wp_ajax_nexgen_refresh_nonce', [ $this, 'handle_refresh_nonce' ] );
+		add_action( 'wp_ajax_nopriv_nexgen_refresh_nonce', [ $this, 'handle_refresh_nonce' ] );
+
 		// Activation hook
 		register_activation_hook( NEXGEN_CHAT_MAIN_FILE, [ $this, 'on_activate' ] );
 	}
@@ -517,6 +521,23 @@ class NexGen_Telegram_Chat {
 			NexGen_Security::log_event( 'test_llm_error', [ 'error' => $e->getMessage() ] );
 			wp_send_json_error( 'Error: ' . $e->getMessage() );
 		}
+	}
+
+	/**
+	 * AJAX: Refresh nonce (no verification needed - this endpoint provides nonces)
+	 * Called when client receives "Nonce inválido" error
+	 *
+	 * @return void
+	 */
+	public function handle_refresh_nonce() {
+		// Generate fresh nonce
+		$new_nonce = NexGen_Security::create_nonce();
+
+		// Return new nonce
+		wp_send_json_success( [
+			'nonce' => $new_nonce,
+			'timestamp' => current_time( 'mysql' ),
+		] );
 	}
 
 	/**

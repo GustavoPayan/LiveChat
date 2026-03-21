@@ -32,6 +32,73 @@ jQuery(document).ready(function($) {
     const $nameInput = $('#nexgen-name-input');
     const $nameSave = $('#nexgen-name-save');
 
+    // **NONCE REFRESH SYSTEM** (Protection against expired nonces)
+    let currentNonce = nexgen_chat_ajax.nonce;  // Mutable, se actualiza cuando expira
+    const NONCE_REFRESH_INTERVAL = 12 * 60 * 60 * 1000;  // 12 hours in ms
+    let nonceRefreshTimer = null;
+
+    /**
+     * Refresh nonce from server (called when nonce expires or preventively)
+     * @returns {Promise<boolean>} True if refresh successful
+     */
+    function refreshNonce() {
+        return $.ajax({
+            url: nexgen_chat_ajax.ajax_url,
+            type: 'POST',
+            data: { action: 'nexgen_refresh_nonce' },
+            timeout: 5000
+        }).done(function(response) {
+            if (response.success && response.data.nonce) {
+                currentNonce = response.data.nonce;
+                if (nexgen_chat_ajax.debug) {
+                    console.log('NexGen Chat - Nonce refreshed at', response.data.timestamp);
+                }
+                return true;
+            }
+            return false;
+        }).fail(function(error) {
+            console.warn('NexGen Chat - Nonce refresh failed:', error);
+            return false;
+        });
+    }
+
+    /**
+     * Make AJAX request with automatic nonce refresh on "Nonce inválido" error
+     * @param {object} ajaxConfig - jQuery AJAX config
+     * @param {boolean} retryOnNonceError - Should we retry if nonce is invalid (default true)
+     * @returns {Promise}
+     */
+    function makeAjaxWithNonceRetry(ajaxConfig, retryOnNonceError = true) {
+        // Set current nonce before sending
+        if (!ajaxConfig.data) ajaxConfig.data = {};
+        ajaxConfig.data.nonce = currentNonce;
+
+        return $.ajax(ajaxConfig).fail(function(xhr, status, error) {
+            // Check if error is "Nonce inválido" and we can retry
+            if (retryOnNonceError && xhr.responseJSON && xhr.responseJSON.data === 'Nonce inválido') {
+                if (nexgen_chat_ajax.debug) {
+                    console.log('NexGen Chat - Nonce expired, refreshing and retrying...');
+                }
+                
+                // Refresh nonce and retry
+                return refreshNonce().done(function() {
+                    ajaxConfig.data.nonce = currentNonce;  // Update nonce
+                    return $.ajax(ajaxConfig);  // Retry with new nonce
+                });
+            }
+            return $.Deferred().reject(xhr, status, error);
+        });
+    }
+
+    // Set up preventive nonce refresh every 12 hours
+    function setupNonceRefreshTimer() {
+        if (nonceRefreshTimer) clearInterval(nonceRefreshTimer);
+        nonceRefreshTimer = setInterval(function() {
+            refreshNonce();  // Silent refresh in background
+        }, NONCE_REFRESH_INTERVAL);
+    }
+    setupNonceRefreshTimer();
+
     // Debug
     if (nexgen_chat_ajax.debug) {
         console.log('NexGen Chat - Configuración:', settings);
@@ -164,15 +231,14 @@ jQuery(document).ready(function($) {
         // Mostrar indicador de escritura
         showTyping();
 
-        // Enviar mensaje via AJAX
-        $.ajax({
+        // Enviar mensaje via AJAX (with automatic nonce retry)
+        makeAjaxWithNonceRetry({
             url: nexgen_chat_ajax.ajax_url,
             type: 'POST',
             data: {
                 action: 'nexgen_send_message',
                 message: message,
-                session_id: sessionId,
-                nonce: nexgen_chat_ajax.nonce
+                session_id: sessionId
             },
             timeout: 30000,
             success: function(response) {
@@ -212,14 +278,13 @@ jQuery(document).ready(function($) {
     }
 
     function loadExistingMessages() {
-        $.ajax({
+        makeAjaxWithNonceRetry({
             url: nexgen_chat_ajax.ajax_url,
             type: 'POST',
             data: {
                 action: 'nexgen_get_messages',
                 session_id: sessionId,
-                last_message_id: 0,
-                nonce: nexgen_chat_ajax.nonce
+                last_message_id: 0
             },
             success: function(response) {
                 if (response.success && response.data.length > 0) {
@@ -237,19 +302,14 @@ jQuery(document).ready(function($) {
         });
     }
 
-    function startPolling() {
-        pollTimer = setInterval(checkForNewMessages, settings.poll_interval);
-    }
-
     function checkForNewMessages() {
-        $.ajax({
+        makeAjaxWithNonceRetry({
             url: nexgen_chat_ajax.ajax_url,
             type: 'POST',
             data: {
                 action: 'nexgen_get_messages',
                 session_id: sessionId,
-                last_message_id: lastMessageId,
-                nonce: nexgen_chat_ajax.nonce
+                last_message_id: lastMessageId
             },
             success: function(response) {
                 if (response.success && response.data.length > 0) {
@@ -275,14 +335,13 @@ jQuery(document).ready(function($) {
     function loadConversation(offset, limit) {
         isLoadingMore = true;
 
-        $.ajax({
+        makeAjaxWithNonceRetry({
             url: nexgen_chat_ajax.ajax_url,
             type: 'GET',
             data: {
                 action: 'nexgen_get_conversation',
                 offset: offset,
-                limit: limit,
-                nonce: nexgen_chat_ajax.nonce
+                limit: limit
             },
             timeout: 10000,
             success: function(response) {
@@ -464,13 +523,12 @@ jQuery(document).ready(function($) {
 
         $nameSave.prop('disabled', true).text('Guardando...');
 
-        $.ajax({
+        makeAjaxWithNonceRetry({
             url: nexgen_chat_ajax.ajax_url,
             type: 'POST',
             data: {
                 action: 'nexgen_set_chat_name',
-                name: rawName,
-                nonce: nexgen_chat_ajax.nonce
+                name: rawName
             },
             success: function(resp) {
                 if (resp.success) {
@@ -478,6 +536,21 @@ jQuery(document).ready(function($) {
                     try { sessionStorage.setItem('nexgen_chat_name', rawName); } catch(e) {}
                     hideNameOverlay();
                     addSystemMessage('Gracias, ' + rawName + '. Ahora puedes escribir tu mensaje.');
+                    loadExistingMessages();
+                } else {
+                    $nameInput.addClass('nexgen-input-error');
+                    alert('Error: ' + (resp.data || 'No se pudo guardar el nombre'));
+                }
+            },
+            error: function(xhr, status, error) {
+                $nameInput.addClass('nexgen-input-error');
+                alert('Error al guardar nombre: ' + error);
+            },
+            complete: function() {
+                $nameSave.prop('disabled', false).text('Empezar chat');
+            }
+        });
+    }
                     $input.focus();
 
                     if (nexgen_chat_ajax.debug) {
