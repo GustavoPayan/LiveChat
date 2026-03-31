@@ -20,8 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	<?php if ( $is_configured ) : ?>
 		<div class="notice notice-success">
 			<p>✅ Bot configurado correctamente.</p>
-			<button type="button" class="button" onclick="testTelegramConnection()">Enviar mensaje de prueba</button>
-			<button type="button" class="button button-primary" onclick="setupWebhook()">Configurar Webhook</button>
+			<button type="button" class="button" onclick="testTelegramConnection(event)">Enviar mensaje de prueba</button>
+			<button type="button" class="button button-primary" onclick="setupWebhook(event)">Configurar Webhook</button>
 		</div>
 	<?php else : ?>
 		<div class="notice notice-warning">
@@ -245,7 +245,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 			<div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
 				<h4>🧪 Prueba de Conexión LLM</h4>
-				<button type="button" class="button button-primary" onclick="testLLMConnection()">🧪 Probar Conexión LLM</button>
+				<button type="button" class="button button-primary" onclick="testLLMConnection(event)">🧪 Probar Conexión LLM</button>
 				<p class="description" style="margin-top: 10px;">Envía un mensaje de prueba a tu proveedor IA.</p>
 			</div>
 
@@ -306,7 +306,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 		<div style="background: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
 			<h4>🧪 Prueba de Conexión N8N</h4>
-			<button type="button" class="button button-primary" onclick="testN8NConnection()">🧪 Probar Conexión N8N</button>
+			<button type="button" class="button button-primary" onclick="testN8NConnection(event)">🧪 Probar Conexión N8N</button>
 			<p class="description" style="margin-top: 10px;">Envía un mensaje de prueba a tu webhook N8N para verificar que está funcionando.</p>
 		</div>
 
@@ -453,38 +453,60 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 });
 
-function testTelegramConnection() {
-	const button = event.target;
-	const originalText = button.textContent;
-	button.textContent = 'Enviando...';
-	button.disabled = true;
+function getAdminButton(event, defaultText) {
+	const button = event?.target || document.activeElement;
+	return {
+		button: button && button.tagName === 'BUTTON' ? button : null,
+		originalText: button && button.tagName === 'BUTTON' ? button.textContent : defaultText || ''
+	};
+}
+
+async function parseJsonOrText(response) {
+	const text = await response.text();
+	try {
+		return JSON.parse(text);
+	} catch (err) {
+		const cleaned = text.replace(/\s+/g, ' ').trim();
+		throw new Error('Invalid JSON response from server: ' + cleaned);
+	}
+}
+
+function testTelegramConnection(event) {
+	const { button, originalText } = getAdminButton(event, 'Enviar...');
+	if (button) {
+		button.textContent = 'Enviando...';
+		button.disabled = true;
+	}
 
 	fetch(ajaxurl, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: 'action=nexgen_debug_test'
 	})
-	.then(r => r.json())
+	.then(parseJsonOrText)
 	.then(data => alert((data.success ? '✅ ' : '❌ Error: ') + data.data))
-	.catch(err => alert('❌ Error de conexión: ' + err))
+	.catch(err => alert('❌ Error de conexión: ' + err.message))
 	.finally(() => {
-		button.textContent = originalText;
-		button.disabled = false;
+		if (button) {
+			button.textContent = originalText;
+			button.disabled = false;
+		}
 	});
 }
 
-function setupWebhook() {
-	const button = event.target;
-	const originalText = button.textContent;
-	button.textContent = 'Configurando...';
-	button.disabled = true;
+function setupWebhook(event) {
+	const { button, originalText } = getAdminButton(event, 'Configurando...');
+	if (button) {
+		button.textContent = 'Configurando...';
+		button.disabled = true;
+	}
 
 	fetch(ajaxurl, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: 'action=nexgen_set_webhook'
 	})
-	.then(r => r.json())
+	.then(parseJsonOrText)
 	.then(data => {
 		if (data.success) {
 			alert('✅ ' + data.data + '\n\n🎉 ¡Ya puedes responder desde Telegram y se verá en el chat web!');
@@ -492,25 +514,28 @@ function setupWebhook() {
 			alert('❌ Error: ' + data.data);
 		}
 	})
-	.catch(err => alert('❌ Error de conexión: ' + err))
+	.catch(err => alert('❌ Error de conexión: ' + err.message))
 	.finally(() => {
-		button.textContent = originalText;
-		button.disabled = false;
+		if (button) {
+			button.textContent = originalText;
+			button.disabled = false;
+		}
 	});
 }
 
-function testN8NConnection() {
-	const button = event.target;
-	const originalText = button.textContent;
-	button.textContent = 'Probando...';
-	button.disabled = true;
+function testN8NConnection(event) {
+	const { button, originalText } = getAdminButton(event, 'Probando...');
+	if (button) {
+		button.textContent = 'Probando...';
+		button.disabled = true;
+	}
 
 	fetch(ajaxurl, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: 'action=nexgen_test_n8n'
 	})
-	.then(r => r.json())
+	.then(parseJsonOrText)
 	.then(data => {
 		if (data.success) {
 			const response = data.data.response ? '\n\n📝 Respuesta de N8N:\n' + data.data.response : '';
@@ -519,25 +544,28 @@ function testN8NConnection() {
 			alert('❌ ' + data.data);
 		}
 	})
-	.catch(err => alert('❌ Error de conexión: ' + err))
+	.catch(err => alert('❌ Error de conexión: ' + err.message))
 	.finally(() => {
-		button.textContent = originalText;
-		button.disabled = false;
+		if (button) {
+			button.textContent = originalText;
+			button.disabled = false;
+		}
 	});
 }
 
-function testLLMConnection() {
-	const button = event.target;
-	const originalText = button.textContent;
-	button.textContent = 'Probando...';
-	button.disabled = true;
+function testLLMConnection(event) {
+	const { button, originalText } = getAdminButton(event, 'Probando...');
+	if (button) {
+		button.textContent = 'Probando...';
+		button.disabled = true;
+	}
 
 	fetch(ajaxurl, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		body: 'action=nexgen_test_llm'
 	})
-	.then(r => r.json())
+	.then(parseJsonOrText)
 	.then(data => {
 		if (data.success) {
 			alert('✅ Conexión LLM exitosa!\n\n📝 Respuesta:\n' + data.data.response + '\n\n⏱️ Latencia: ' + data.data.latency_ms + 'ms\n💰 Costo: $' + data.data.cost.toFixed(4));
@@ -545,10 +573,12 @@ function testLLMConnection() {
 			alert('❌ Error: ' + data.data);
 		}
 	})
-	.catch(err => alert('❌ Error de conexión: ' + err))
+	.catch(err => alert('❌ Error de conexión: ' + err.message))
 	.finally(() => {
-		button.textContent = originalText;
-		button.disabled = false;
+		if (button) {
+			button.textContent = originalText;
+			button.disabled = false;
+		}
 	});
 }
 

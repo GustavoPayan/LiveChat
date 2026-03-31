@@ -69,25 +69,39 @@ jQuery(document).ready(function($) {
      * @returns {Promise}
      */
     function makeAjaxWithNonceRetry(ajaxConfig, retryOnNonceError = true) {
-        // Set current nonce before sending
         if (!ajaxConfig.data) ajaxConfig.data = {};
         ajaxConfig.data.nonce = currentNonce;
 
-        return $.ajax(ajaxConfig).fail(function(xhr, status, error) {
-            // Check if error is "Nonce inválido" and we can retry
-            if (retryOnNonceError && xhr.responseJSON && xhr.responseJSON.data === 'Nonce inválido') {
-                if (nexgen_chat_ajax.debug) {
-                    console.log('NexGen Chat - Nonce expired, refreshing and retrying...');
+        return $.Deferred(function(deferred) {
+            const request = $.ajax(ajaxConfig);
+
+            request.done(function(...args) {
+                deferred.resolveWith(this, args);
+            });
+
+            request.fail(function(xhr, status, error) {
+                if (retryOnNonceError && xhr.responseJSON && xhr.responseJSON.data === 'Nonce inválido') {
+                    if (nexgen_chat_ajax.debug) {
+                        console.log('NexGen Chat - Nonce expired, refreshing and retrying...');
+                    }
+
+                    refreshNonce().done(function() {
+                        ajaxConfig.data.nonce = currentNonce;
+                        $.ajax(ajaxConfig)
+                            .done(function(...retryArgs) {
+                                deferred.resolveWith(this, retryArgs);
+                            })
+                            .fail(function(...retryFailArgs) {
+                                deferred.rejectWith(this, retryFailArgs);
+                            });
+                    }).fail(function() {
+                        deferred.reject(xhr, status, error);
+                    });
+                } else {
+                    deferred.reject(xhr, status, error);
                 }
-                
-                // Refresh nonce and retry
-                return refreshNonce().done(function() {
-                    ajaxConfig.data.nonce = currentNonce;  // Update nonce
-                    return $.ajax(ajaxConfig);  // Retry with new nonce
-                });
-            }
-            return $.Deferred().reject(xhr, status, error);
-        });
+            });
+        }).promise();
     }
 
     // Set up preventive nonce refresh every 12 hours
@@ -545,23 +559,6 @@ jQuery(document).ready(function($) {
             error: function(xhr, status, error) {
                 $nameInput.addClass('nexgen-input-error');
                 alert('Error al guardar nombre: ' + error);
-            },
-            complete: function() {
-                $nameSave.prop('disabled', false).text('Empezar chat');
-            }
-        });
-    }
-                    $input.focus();
-
-                    if (nexgen_chat_ajax.debug) {
-                        console.log('NexGen Chat - Nuevo Session ID:', sessionId);
-                    }
-                } else {
-                    alert(resp.data || 'No se pudo guardar el nombre. Intenta nuevamente.');
-                }
-            },
-            error: function() {
-                alert('Error de conexión al guardar el nombre.');
             },
             complete: function() {
                 $nameSave.prop('disabled', false).text('Empezar chat');
