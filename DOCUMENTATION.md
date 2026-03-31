@@ -53,7 +53,7 @@ WordPress Admin
     → NexGen Chat
       → ⚡ IA/LLM
         → En sesión anterior: Cambiar proveedor a "Google Gemini 2.0"
-        → Pegar API Key: AIzaSyAVPMLKEqV134PrXV6JnqJcOhD_g9-jZSE
+        → Pegar API Key
         → Rellenar: Descripción del negocio
         → Clic: 🧪 Probar Conexión LLM
         → Guardar cambios
